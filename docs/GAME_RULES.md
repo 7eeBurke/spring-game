@@ -111,30 +111,31 @@ HP represents overall ability to continue. Body-part state represents local func
 
 ## Weapons
 
-V1 weapons:
+`DamageType`:
+- `SLASHING`
+- `PIERCING`
+- `BLUNT`
+- `FIRE`
+
+The exact bundled weapon values (base damage, trauma, primary damage type) are defined in `src/main/resources/content/weapons.json` and documented in `CONTENT.md`. The notes below describe each weapon's intended character.
+
+A weapon's primary damage type is content identity only. Which damage a particular attack method deals (for example an Ember Rod used as a physical striking tool) is deferred.
 
 ### Longsword
-- primary type: slashing
-- base damage ~6
-- trauma ~3
+- primary type: `SLASHING`
 - flexible attack/defense weapon
 
 ### Dagger
-- primary type: piercing
-- base damage ~4
-- trauma ~2
+- primary type: `PIERCING`
 - light, precise, short reach
 
 ### War Hammer
-- primary type: blunt
-- base damage ~7
-- trauma ~6
+- primary type: `BLUNT`
 - high local trauma, strong vs bone/structures
 
 ### Ember Rod
-- fire/arcane focus
-- base damage ~5 placeholder
-- trauma ~3 placeholder
+- primary type: `FIRE` (fire/arcane focus)
+- base damage and trauma remain placeholder values pending balancing
 - weak physical weapon, strong projected magical focus
 
 Supported canonical attack methods:

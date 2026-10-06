@@ -180,6 +180,8 @@ The `generationContextSnapshot` contains the recent-content/anti-repeat informat
 
 The same `runSeed` plus the same `generationContextSnapshot` must reproduce the same generated region.
 
+This reproduction assumes the same game-rules and static-content version (see `CONTENT.md`). Cross-version replay and content versioning are deferred.
+
 After generation, validate hard constraints such as:
 - boss reachable;
 - required scenes connected;

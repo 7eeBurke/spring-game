@@ -1,0 +1,8 @@
+[
+  { "code": "BANDAGE",           "displayName": "Bandage",           "category": "RECOVERY" },
+  { "code": "RESTORATIVE_SALVE", "displayName": "Restorative Salve", "category": "RECOVERY" },
+  { "code": "ROPE",              "displayName": "Rope",              "category": "UTILITY" },
+  { "code": "TORCH",             "displayName": "Torch",             "category": "UTILITY" },
+  { "code": "CROWBAR",           "displayName": "Crowbar",           "category": "UTILITY" },
+  { "code": "LOCKPICKS",         "displayName": "Lockpicks",         "category": "UTILITY" }
+]

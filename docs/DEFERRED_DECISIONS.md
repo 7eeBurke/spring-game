@@ -41,6 +41,8 @@ If a stage requires one of these, flag it and get a decision before implementing
 - Hazard mechanics.
 - Event mechanics and Fated variations.
 - Rare Fated starting modifications.
+- Weapon definition extensions: supported attack methods, suitability, tags, handedness, stat affinities, attack-form modifiers.
+- Runtime item/weapon instance ID format (distinct from static definition codes).
 
 ## Generation
 
@@ -50,6 +52,7 @@ If a stage requires one of these, flag it and get a decision before implementing
 - Scene content budgets.
 - Boss-gate progression route mechanics.
 - Anti-repeat history window and weighting strength.
+- Cross-version deterministic replay and static-content versioning (reproduction currently assumes the same rules/content version).
 
 ## Presentation and Contracts
 

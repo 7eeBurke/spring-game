@@ -1,0 +1,2 @@
+[ { "code": "LONGSWORD", "displayName": "Longsword", "baseDamage": 6, "trauma": 3, "primaryDamageType": "SLASHING" },
+  { "code": "LONGSWORD", "displayName": "Second Longsword", "baseDamage": 5, "trauma": 2, "primaryDamageType": "SLASHING" } ]

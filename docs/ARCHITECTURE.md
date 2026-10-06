@@ -87,6 +87,7 @@ It may dramatize confirmed facts but may not add consequences or interactable ob
 Feature-oriented packages under the base package `com.leeburke.springgame`, growing toward:
 - `config` — Spring configuration
 - `shared` — small cross-feature value types/utilities
+- `content` — static authored definitions (weapons, passives, abilities, items) loaded from classpath JSON into an immutable catalogue (see `CONTENT.md`)
 - `character` — character generation and character state
 - `mechanics` — checks, DCs, suitability, damage, trauma
 - `action` — `ActionIntent`, validation, step resolution, `ResolvedOutcome`
@@ -109,6 +110,7 @@ Domain game logic stays independent of Spring wherever practical (plain Java cla
 - Flyway for schema migrations
 - Hibernate schema validation (`ddl-auto=validate`), not automatic schema creation
 - Testcontainers PostgreSQL for database integration tests
+- Jackson 3 (`tools.jackson`, version managed by the Spring Boot parent) for static content JSON
 - React + TypeScript + Vite for the frontend (later stage)
 - Lombok is optional
 
@@ -121,4 +123,4 @@ The AI provider is deliberately unspecified until the AI integration stage. Do n
 - `SceneInstance` always belongs to a run. A region scene also belongs to a `RegionInstance`; the hub scene (`THE_LAST_LANTERN`) has no region association. Each scene instance is identified as a hub or region scene.
 - A generated region is built and validated fully in memory, then persisted in a single transaction; invalid regions are never persisted.
 - Dynamic nested `SceneState` content may be persisted as PostgreSQL JSONB.
-- Static game definitions (weapons, items, passives, abilities, enemies, scene archetypes, events) do not automatically become database tables.
+- Static game definitions (weapons, items, passives, abilities, enemies, scene archetypes, events) do not automatically become database tables. Weapons, passives, abilities and items are authored in `src/main/resources/content/*.json` (see `CONTENT.md`); run state refers to them by definition code.

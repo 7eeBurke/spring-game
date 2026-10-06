@@ -1,0 +1,6 @@
+[
+  { "code": "LONGSWORD",  "displayName": "Longsword",  "baseDamage": 6, "trauma": 3, "primaryDamageType": "SLASHING" },
+  { "code": "DAGGER",     "displayName": "Dagger",     "baseDamage": 4, "trauma": 2, "primaryDamageType": "PIERCING" },
+  { "code": "WAR_HAMMER", "displayName": "War Hammer", "baseDamage": 7, "trauma": 6, "primaryDamageType": "BLUNT" },
+  { "code": "EMBER_ROD",  "displayName": "Ember Rod",  "baseDamage": 5, "trauma": 3, "primaryDamageType": "FIRE" }
+]

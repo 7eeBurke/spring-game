@@ -1,0 +1,8 @@
+[
+  { "code": "LIGHT_FOOT",  "displayName": "Light Foot" },
+  { "code": "IRON_GRIP",   "displayName": "Iron Grip" },
+  { "code": "GRAVE_SENSE", "displayName": "Grave Sense" },
+  { "code": "CLEAR_MIND",  "displayName": "Clear Mind" },
+  { "code": "IMPROVISER",  "displayName": "Improviser" },
+  { "code": "ASH_TOUCHED", "displayName": "Ash Touched" }
+]
