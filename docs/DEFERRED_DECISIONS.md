@@ -42,7 +42,6 @@ If a stage requires one of these, flag it and get a decision before implementing
 ## Generation
 
 - Content weights: weapon affinity, passive, ability, starting items, loadout coherence effects.
-- Stat-spread selection weighting.
 - Name generation source.
 - Scene-role → archetype compatibility.
 - Scene content budgets.

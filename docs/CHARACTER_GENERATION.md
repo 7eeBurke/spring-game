@@ -40,6 +40,15 @@ Profiles:
 
 Generation should select from valid 27-point spreads satisfying the chosen profile, then randomly assign values across the five stats.
 
+Spread selection:
+1. choose a profile by the weights above;
+2. choose one canonical shape (the five values as an unordered multiset, duplicates allowed) uniformly from the shapes matching that profile;
+3. shuffle the shape's values across the five stats.
+
+Selection is uniform over canonical shapes, not over already-ordered stat blocks. Choosing uniformly over ordered blocks would make shapes with more distinct values disproportionately common, because they have more permutations.
+
+The three profiles are exhaustive and mutually exclusive over valid 27-point shapes.
+
 A 10 should be genuinely uncommon and meaningful.
 
 ## Fated
