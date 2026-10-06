@@ -14,7 +14,9 @@ If a stage requires one of these, flag it and get a decision before implementing
 - How a defense result maps to `ContactQuality` and `defensiveMitigation`.
 - Mapping from canonical attack methods to universal attack templates.
 - Attack-property shift/override values.
-- Effectiveness determination (weapon/damage type vs target).
+- Effectiveness determination (weapon/damage type vs target). The levels and their multipliers are defined in `GAME_RULES.md`; only how a level is chosen is deferred.
+- Attack-form modifier values for trauma (for example deep-cut, penetrating, crushing forms) and how a form is derived.
+- Anatomy interaction modifier values for trauma.
 - Exact `WHILE` resolution semantics (beyond: genuinely simultaneous, subject to simultaneous-action complexity).
 - Detailed social (`COMMUNICATE`) resolution rules.
 
@@ -22,6 +24,7 @@ If a stage requires one of these, flag it and get a decision before implementing
 
 - Condition behaviour (`BLEEDING`, `FRACTURED`, `BURNED`, `POISONED`).
 - Body-part severity escalation thresholds.
+- Existing-injury trauma modifier for a `DESTROYED` part (the `GAME_RULES.md` table covers healthy to crippled only).
 - Healing and recovery-item effects.
 
 ## Enemies

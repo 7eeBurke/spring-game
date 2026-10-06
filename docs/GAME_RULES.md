@@ -226,7 +226,13 @@ HP formula:
 
 `round(baseDamage × contactMultiplier × effectivenessMultiplier) - protection`
 
+Final HP damage is `max(0, that value)`: protection never makes damage negative or heals.
+
+Rounding is to the nearest whole HP; an exact half rounds up (all inputs are non-negative).
+There is deliberately no minimum-one-damage rule: a glancing or ineffective hit may make contact and still deal 0 HP.
+
 Contact multipliers:
+- none 0 (no contact, so no damage)
 - glancing 0.5
 - solid 1.0
 - clean 1.25
@@ -237,6 +243,8 @@ Effectiveness multipliers:
 - `NORMAL` 1.0
 - `HIGH` 1.25
 - `VERY_HIGH` 1.5
+
+The effectiveness levels and multipliers are defined here. How effectiveness is determined (weapon/damage type vs target anatomy, material or creature type) is deferred (see `DEFERRED_DECISIONS.md`).
 
 Execution, impact and effectiveness are separate concepts.
 
@@ -262,6 +270,10 @@ Existing injury modifier:
 - injured +1
 - wounded +2
 - crippled +3
+
+Trauma is only calculated when contact occurred. `ContactQuality.NONE` means no impact: there is no contact modifier, no trauma score and no `ImpactSeverity`.
+
+When contact occurred, the raw trauma score is preserved as calculated (it may be negative after protection and mitigation). The effective score is `max(0, raw score)`, and the thresholds below apply to the effective score. There is no upper limit.
 
 `ImpactSeverity` thresholds:
 - 0–2 `GLANCING`
