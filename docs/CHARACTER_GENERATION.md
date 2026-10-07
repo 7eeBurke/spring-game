@@ -28,6 +28,17 @@ The generated-character model enforces structural validity only:
 
 The exact V1 generation policy (the HP formula, an all-healthy body, the Fated distribution, uniform selection) belongs to the generator, not the model. The model can therefore represent, for example, a non-healthy body part or a different max HP, leaving room for rare Fated starting modifications without a model change.
 
+### Generated vs Persisted Character State
+
+`GeneratedCharacter` is a creation result only. It requires a new character's shape: full health and the starting tool-belt composition.
+
+`PlayerCharacterState` is the ongoing character state. It is what a persisted run stores and loads, and it is created from a `GeneratedCharacter` when a run is created. It enforces only structural validity:
+- every field present, a non-blank name;
+- `maxHp >= 1` and `0 <= currentHp <= maxHp`;
+- a valid body (any severities) and a valid tool belt (any mix of up to 5 entries).
+
+Loading never produces a `GeneratedCharacter`, so later states such as reduced HP or changed belt contents load normally.
+
 ## Stat Budget
 
 Five stats, total 27 points.

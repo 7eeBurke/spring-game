@@ -52,7 +52,7 @@ If a stage requires one of these, flag it and get a decision before implementing
 - Scene content budgets.
 - Boss-gate progression route mechanics.
 - Anti-repeat history window and weighting strength.
-- Cross-version deterministic replay and static-content versioning (reproduction currently assumes the same rules/content version).
+- Cross-version deterministic replay and static-content versioning (reproduction currently assumes the same rules/content version). Persisted runs store definition codes; a run referencing a code that was later removed or renamed fails to load clearly. Migrating stored codes is deferred.
 
 ## Presentation and Contracts
 

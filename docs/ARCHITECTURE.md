@@ -94,12 +94,15 @@ Feature-oriented packages under the base package `com.leeburke.springgame`, grow
 - `combat`
 - `enemy`
 - `world` — region/scene generation, `SceneState`, `PlayerSceneView`
-- `run` — run lifecycle
+- `run` — run lifecycle and the `GameRun` read model
+- `persistence` — JPA entities, entity/domain mapping and the run persistence facade (`GameRunStore`)
 - `ai` — AI role adapters and deterministic fallbacks
 - `api` — HTTP controllers and request/response DTOs
 
 Packages are created only when a stage needs them.
-Domain game logic stays independent of Spring wherever practical (plain Java classes, constructor-injected, unit-testable without a Spring context); Spring wiring lives at the edges (`config`, `api`, persistence adapters).
+Domain game logic stays independent of Spring wherever practical (plain Java classes, constructor-injected, unit-testable without a Spring context); Spring wiring lives at the edges (`config`, `api`, `persistence`).
+
+Dependency direction: `persistence` depends on `run`, `character`, `content` and `mechanics`, never the reverse. Domain and content types carry no JPA or Spring annotations; JPA entities stay inside `persistence` and are never returned to callers.
 
 ## Technology Stack
 
@@ -124,3 +127,26 @@ The AI provider is deliberately unspecified until the AI integration stage. Do n
 - A generated region is built and validated fully in memory, then persisted in a single transaction; invalid regions are never persisted.
 - Dynamic nested `SceneState` content may be persisted as PostgreSQL JSONB.
 - Static game definitions (weapons, items, passives, abilities, enemies, scene archetypes, events) do not automatically become database tables. Weapons, passives, abilities and items are authored in `src/main/resources/content/*.json` (see `CONTENT.md`); run state refers to them by definition code.
+
+### Schema Ownership
+
+- Flyway owns the schema. Migrations live in `src/main/resources/db/migration/`.
+- Hibernate only validates the migrated schema (`spring.jpa.hibernate.ddl-auto=validate`); it never creates or updates tables.
+- Open Session in View is disabled (`spring.jpa.open-in-view=false`); loading and mapping happen inside service transactions.
+- Simple stable structural rules are database constraints: keys, foreign keys, one character per run, NOT NULL, stat range 3–10, Fated 0–5, `max_hp >= 1`, `0 <= current_hp <= max_hp`, tool-belt slot 0–4, and the stable enum-name sets. Enums are stored by name, never by ordinal.
+- Generation policy (stat total and profiles, Fated distribution, HP formula, starting belt composition) is not duplicated in SQL.
+
+### Current Tables (V1)
+
+- `game_run` — internal UUID identity and the run seed.
+- `player_character` — keyed by `run_id` (the run's ID, so one character per run): name, five stats, Fated, max/current HP, passive and ability definition codes.
+- `player_body_part` — one row per body part and its severity.
+- `player_tool_belt_entry` — one row per occupied belt slot: slot index (list position), entry kind (`WEAPON`/`ITEM`) and definition code. No runtime instance IDs.
+
+### Static Content References
+
+- Saving stores definition codes only, and only for definitions identical to the current catalogue's definition for that code.
+- Loading resolves codes through the current `GameContentCatalog`. An unknown code, a run without its player character, or any stored value that fails domain validation raises a clear error; a partial state is never returned.
+- Loading across changed static-content versions is not guaranteed (see `CONTENT.md` and `DEFERRED_DECISIONS.md`).
+
+Player and run state is relational. JSONB is reserved for the later dynamic `SceneState`, not used for simple fixed state.

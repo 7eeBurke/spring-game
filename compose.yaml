@@ -1,0 +1,23 @@
+# Local PostgreSQL for development. Flyway creates the tables when the application starts.
+services:
+  postgres:
+    image: postgres:18.4
+    environment:
+      POSTGRES_DB: spring_game
+      POSTGRES_USER: spring_game
+      POSTGRES_PASSWORD: spring_game
+    ports:
+      # Host port defaults to 5433 to avoid clashing with a locally installed PostgreSQL on 5432.
+      # Override with SPRING_GAME_DB_PORT (and SPRING_DATASOURCE_URL to match). Container port stays 5432.
+      - "${SPRING_GAME_DB_PORT:-5433}:5432"
+    volumes:
+      # PostgreSQL 18 images keep data under /var/lib/postgresql (not .../data).
+      - spring-game-postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spring_game -d spring_game"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  spring-game-postgres:
