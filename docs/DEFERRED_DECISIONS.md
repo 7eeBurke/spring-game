@@ -40,6 +40,7 @@ If a stage requires one of these, flag it and get a decision before implementing
 - Utility tool effects.
 - Hazard mechanics.
 - Event mechanics and Fated variations.
+- Reward granting, including the Ashen Sigil from the Chapel Guardian.
 - Rare Fated starting modifications.
 - Fated consequences: use of the qualitative bands, rare events, enemy variants, rewards (only the numeric value is generated and stored).
 - Weapon definition extensions: supported attack methods, suitability, tags, handedness, stat affinities, attack-form modifiers.
@@ -48,15 +49,22 @@ If a stage requires one of these, flag it and get a decision before implementing
 ## Generation
 
 - Starting-content weighting: weapon stat affinity, passive/ability/item weighting, loadout coherence (`LOW`/`MEDIUM`/`HIGH`) and its effects, redundancy weighting. Character generation currently uses uniform independent selection within each pool as a baseline; this is not a decision to drop weighting.
-- Scene-role → archetype compatibility.
-- Scene content budgets.
-- Boss-gate progression route mechanics.
-- Anti-repeat history window and weighting strength.
+- Thematic scene roles (combat, event, resource, danger, …) and their compatibility with archetypes. Generation currently uses structural roles only (entry, route, pre-boss, optional, boss).
+- Scene content budgets beyond per-slot chances (for example region-wide limits on enemies or hazards).
+- Objective and gate mechanics, including boss-gate routes with multiple solution categories. The generated graph is currently fully traversable with no locks.
+- Validation of recovery opportunities before the boss and of threat pacing between scenes.
+- Anti-repetition across runs beyond the opening scene (events, enemies, layouts). The opening anti-repeat window (3 recent openers) and its weights are defined in `WORLD_GENERATION.md`.
+- Event uniqueness rules beyond the current baseline that every event is unique within a region.
+- Building the generation-context snapshot from a player's recent runs (needs an account/orchestration layer); callers currently supply it.
+- Fated effects on generation (counts, weights, events, hazards, rewards, openers). Fated has no effect on generation.
+- Future regions beyond Hollow Chapel.
 - Cross-version deterministic replay and static-content versioning (reproduction currently assumes the same rules/content version). Persisted runs store definition codes; a run referencing a code that was later removed or renamed fails to load clearly. Migrating stored codes is deferred.
+- Migration of persisted generation-context documents between `schema_version`s.
 
 ## World and Scenes
 
 - Scene history: the entry schema for recent changes/action history (not yet part of `SceneState`).
+- Movement execution, reveal and discovery mutations.
 - Visibility / line-of-sight algorithm that produces the set of currently visible zones (the projector only filters safely given that set).
 - How active events and environment flags become player-perceivable in `PlayerSceneView`.
 - Per-object and per-zone state (for example burned, open) and zone tags.

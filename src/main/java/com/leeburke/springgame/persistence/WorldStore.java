@@ -1,5 +1,6 @@
 package com.leeburke.springgame.persistence;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -10,16 +11,22 @@ import jakarta.persistence.OptimisticLockException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.leeburke.springgame.content.world.RegionDefinition;
+import com.leeburke.springgame.content.world.WorldContentCatalog;
 import com.leeburke.springgame.world.HiddenContentKind;
 import com.leeburke.springgame.world.PlayerLocation;
 import com.leeburke.springgame.world.RegionInstance;
 import com.leeburke.springgame.world.SceneInstance;
 import com.leeburke.springgame.world.ScenePlacement;
 import com.leeburke.springgame.world.SceneState;
+import com.leeburke.springgame.world.generation.CompleteRegionValidator;
+import com.leeburke.springgame.world.generation.GeneratedRunWorld;
+import com.leeburke.springgame.world.generation.GenerationContextSnapshot;
 
 /**
- * Persistence facade for world state: regions, scenes and the run's player location. Callers work
- * with {@code world} domain types; entities never leave this package.
+ * Persistence facade for world state: whole-world initialization, regions, scenes, the generation
+ * context and the run's player location. Callers work with {@code world} domain types; entities
+ * never leave this package.
  * <p>
  * Scene state updates are optimistic: callers pass the revision they resolved against, and a stale
  * revision raises {@link StaleSceneStateException} instead of overwriting newer state.
@@ -28,10 +35,64 @@ import com.leeburke.springgame.world.SceneState;
 public class WorldStore {
 
 	private final EntityManager entityManager;
+	private final WorldContentCatalog worldContent;
 	private final SceneStateCodec codec = new SceneStateCodec();
+	private final GenerationContextCodec contextCodec = new GenerationContextCodec();
 
-	public WorldStore(EntityManager entityManager) {
+	public WorldStore(EntityManager entityManager, WorldContentCatalog worldContent) {
 		this.entityManager = Objects.requireNonNull(entityManager, "entityManager");
+		this.worldContent = Objects.requireNonNull(worldContent, "worldContent");
+	}
+
+	/**
+	 * Persists a newly generated run world in one transaction: the generation context, the region,
+	 * the hub and every region scene, then the initial player location. Either all of it commits or
+	 * none of it does. The entities have no JPA associations, so inserts are flushed in foreign-key
+	 * order.
+	 * <p>
+	 * Before writing anything, the region is re-validated with the production
+	 * {@link CompleteRegionValidator}, so a hand-built invalid world can never be persisted.
+	 *
+	 * @throws IllegalArgumentException          if the generated region is invalid; nothing is written
+	 * @throws WorldAlreadyInitializedException if the run already has a world; nothing is written
+	 */
+	@Transactional
+	public void initializeWorld(GeneratedRunWorld world) {
+		Objects.requireNonNull(world, "world");
+		UUID runId = world.runId();
+		RegionDefinition definition = worldContent.findRegion(world.region().region().definitionCode())
+				.orElseThrow(() -> new IllegalArgumentException("Unknown region definition "
+						+ world.region().region().definitionCode()));
+		List<String> problems = new CompleteRegionValidator(definition).problems(world.region());
+		if (!problems.isEmpty()) {
+			throw new IllegalArgumentException("Refusing to persist an invalid generated region for run " + runId + ": " + problems);
+		}
+		if (entityManager.find(RunGenerationContextEntity.class, runId) != null) {
+			throw new WorldAlreadyInitializedException(runId);
+		}
+
+		entityManager.persist(new RunGenerationContextEntity(runId, GenerationContextCodec.CURRENT_SCHEMA_VERSION,
+				contextCodec.encode(world.context())));
+		RegionInstance region = world.region().region();
+		entityManager.persist(new RegionInstanceEntity(region.id(), region.runId(), region.definitionCode()));
+		entityManager.flush();
+
+		insertScene(world.hub());
+		world.region().scenes().forEach(this::insertScene);
+		entityManager.flush();
+
+		entityManager.persist(new RunWorldStateEntity(runId, world.start().sceneId(), world.start().zoneId()));
+		entityManager.flush();
+	}
+
+	/**
+	 * @throws PersistedStateException if the stored context is corrupt or has an unsupported version
+	 */
+	@Transactional(readOnly = true)
+	public Optional<GenerationContextSnapshot> findGenerationContext(UUID runId) {
+		Objects.requireNonNull(runId, "runId");
+		return Optional.ofNullable(entityManager.find(RunGenerationContextEntity.class, runId))
+				.map(e -> contextCodec.decode(runId, e.getSchemaVersion(), e.getSnapshot()));
 	}
 
 	@Transactional
@@ -56,6 +117,10 @@ public class WorldStore {
 	 */
 	@Transactional
 	public void persistScene(SceneInstance scene) {
+		insertScene(scene);
+	}
+
+	private void insertScene(SceneInstance scene) {
 		Objects.requireNonNull(scene, "scene");
 		if (scene.revision() != 0) {
 			throw new IllegalArgumentException("A new scene starts at revision 0, but scene " + scene.id() + " had " + scene.revision());

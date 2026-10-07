@@ -1,0 +1,15 @@
+[
+  {
+    "code": "THE_LAST_LANTERN",
+    "displayName": "The Last Lantern",
+    "zones": [
+      { "id": "lantern_hearth", "displayName": "Lantern Hearth" },
+      { "id": "chapel_road", "displayName": "Chapel Road" }
+    ],
+    "connections": [
+      { "id": "hearth_road", "zoneA": "lantern_hearth", "zoneB": "chapel_road" }
+    ],
+    "startZone": "lantern_hearth",
+    "exit": { "id": "road_to_chapel", "zoneId": "chapel_road", "destinationRegion": "HOLLOW_CHAPEL" }
+  }
+]

@@ -88,6 +88,7 @@ Feature-oriented packages under the base package `com.leeburke.springgame`, grow
 - `config` — Spring configuration
 - `shared` — small cross-feature utilities (`DefinitionCodes` code format, `StrictJson` mapper factory); no Spring or JPA
 - `content` — static authored definitions (weapons, passives, abilities, items) loaded from classpath JSON into an immutable catalogue (see `CONTENT.md`)
+  - `content.world` — authored world-generation content (world elements, scene archetypes, regions, fixed scenes) and its catalogue/loader
 - `character` — character generation and character state
 - `mechanics` — checks, DCs, suitability, damage, trauma
 - `action` — `ActionIntent`, validation, step resolution, `ResolvedOutcome`
@@ -95,6 +96,7 @@ Feature-oriented packages under the base package `com.leeburke.springgame`, grow
 - `enemy`
 - `world` — region and scene instances, `SceneState` and its integrity rules, `PlayerLocation` (pure Java; region generation will live alongside later)
   - `world.view` — `PlayerSceneView` and its projector: the player-safe boundary
+  - `world.generation` — deterministic world generation: `RunWorldGenerator`, topology, archetype selection, scene contents, `CompleteRegionValidator`, and the in-memory aggregates `GeneratedRegion` and `GeneratedRunWorld` (pure Java, no Spring)
 - `run` — run lifecycle and the `GameRun` read model
 - `persistence` — JPA entities, entity/domain mapping, the scene-state JSON codec and the persistence facades (`GameRunStore`, `WorldStore`)
 - `ai` — AI role adapters and deterministic fallbacks
@@ -142,10 +144,18 @@ The AI provider is deliberately unspecified until the AI integration stage. Do n
 - `scene_instance.revision` is the JPA `@Version` column, used only for mutable scene state. A new scene starts at 0; every state update increments it.
 - `WorldStore.updateSceneState(sceneId, expectedRevision, newState)` writes only if the scene is still at `expectedRevision`. A stale revision, or a concurrent update that commits first, raises `StaleSceneStateException` and writes nothing. Two resolutions based on the same revision can never both commit.
 
+### World Initialization
+
+- A run's world is generated completely in memory (`world.generation`), producing a `GeneratedRunWorld`: the generation-context snapshot used, the hub, the generated region and the initial player location.
+- Runtime UUIDs come from an injected `IdSource`, kept separate from procedural randomness; they are persistence identity, not part of the reproducibility contract.
+- `WorldStore.initializeWorld(world)` persists it in one transaction. Before any write it re-runs the production `CompleteRegionValidator`, and it fails with `WorldAlreadyInitializedException` if the run already has a world. Inserts are flushed in foreign-key order: generation context and region; then the hub and every region scene; then the initial location. Any failure rolls everything back, so no partial world can remain.
+- There is no replace, reset or reroll operation.
+- `run_generation_context` stores the snapshot as a JSONB document read and written only by `GenerationContextCodec`, with a relational `schema_version` (currently 1); an unsupported version or corrupt document fails clearly.
+
 ### Same-Run Integrity
 
 Composite foreign keys on `(id, run_id)` ensure a scene can only reference a region of its own run, and the run's location can only reference a scene of its own run. The location's zone is validated by the application (zones live inside the JSONB state): it must exist and must not be hidden. Exit destinations inside scene state have no database foreign key; complete-region validation checks them before persistence.
-- Static game definitions (weapons, items, passives, abilities, enemies, scene archetypes, events) do not automatically become database tables. Weapons, passives, abilities and items are authored in `src/main/resources/content/*.json` (see `CONTENT.md`); run state refers to them by definition code.
+- Static game definitions (weapons, items, passives, abilities, enemies, scene archetypes, events) do not automatically become database tables. Weapons, passives, abilities and items are authored in `src/main/resources/content/*.json`, and world-generation content in `src/main/resources/content/world/*.json` (see `CONTENT.md`); run state refers to them by definition code.
 
 ### Schema Ownership
 
@@ -167,6 +177,10 @@ Composite foreign keys on `(id, run_id)` ensure a scene can only reference a reg
 - `region_instance` — region identity, run and definition code.
 - `scene_instance` — scene metadata, `revision`, `state_schema_version` and the JSONB `state`; a check constraint enforces the hub/region shape.
 - `run_world_state` — keyed by `run_id`: the current scene and zone. A run without a world yet has no row.
+
+### Current Tables (V3)
+
+- `run_generation_context` — keyed by `run_id`: the immutable generation-context snapshot (JSONB) and its `schema_version`. One row per run; its presence marks the run's world as initialized.
 
 ### Static Content References
 

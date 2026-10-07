@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -31,7 +32,7 @@ class DatabaseSchemaIntegrationTest {
 	}
 
 	@ParameterizedTest
-	@ValueSource(strings = { "1", "2" })
+	@ValueSource(strings = { "1", "2", "3" })
 	void migrationSucceeded(String version) {
 		Boolean success = jdbc.queryForObject(
 				"SELECT success FROM flyway_schema_history WHERE version = ?", Boolean.class, version);
@@ -50,17 +51,23 @@ class DatabaseSchemaIntegrationTest {
 	}
 
 	@Test
-	void sceneStateIsPostgresJsonb() {
+	void stage9TablesExist() {
+		assertThat(publicTables()).contains("run_generation_context");
+	}
+
+	@ParameterizedTest
+	@CsvSource({ "scene_instance,state", "run_generation_context,snapshot" })
+	void documentColumnsArePostgresJsonb(String table, String column) {
 		String dataType = jdbc.queryForObject("""
 				SELECT data_type FROM information_schema.columns
-				WHERE table_schema = 'public' AND table_name = 'scene_instance' AND column_name = 'state'
-				""", String.class);
+				WHERE table_schema = 'public' AND table_name = ? AND column_name = ?
+				""", String.class, table, column);
 		assertThat(dataType).isEqualTo("jsonb");
 	}
 
 	@ParameterizedTest
 	@ValueSource(strings = { "weapon", "passive", "abilit", "item", "character_name", "content",
-			"region_def", "archetype", "object_def", "hazard_def", "event_def" })
+			"region_def", "archetype", "object_def", "hazard_def", "event_def", "world_element", "fixed_scene" })
 	void noStaticContentDefinitionTables(String contentTypeFragment) {
 		assertThat(publicTables())
 				.filteredOn(table -> !table.equals("player_tool_belt_entry"))

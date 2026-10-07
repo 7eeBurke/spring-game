@@ -5,12 +5,12 @@ package com.leeburke.springgame.world;
  * Unique within their own collection. No format beyond this is imposed: the ID format exposed to
  * AI roles is still deferred.
  */
-final class LocalIds {
+public final class LocalIds {
 
 	private LocalIds() {
 	}
 
-	static String requireLocalId(String id, String label) {
+	public static String requireLocalId(String id, String label) {
 		if (id == null) {
 			throw new NullPointerException(label + " must not be null");
 		}

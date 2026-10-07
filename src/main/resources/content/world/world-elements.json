@@ -1,0 +1,25 @@
+[
+  { "code": "HOLLOW_ACOLYTE",      "displayName": "Hollow Acolyte",      "kind": "ENTITY" },
+  { "code": "BONE_WARDEN",         "displayName": "Bone Warden",         "kind": "ENTITY" },
+  { "code": "ASHBOUND_PENITENT",   "displayName": "Ashbound Penitent",   "kind": "ENTITY" },
+  { "code": "CHAPEL_GUARDIAN",     "displayName": "Chapel Guardian",     "kind": "ENTITY" },
+
+  { "code": "WOODEN_PEW",          "displayName": "Wooden Pew",          "kind": "OBJECT" },
+  { "code": "STONE_PILLAR",        "displayName": "Stone Pillar",        "kind": "OBJECT" },
+  { "code": "ALTAR",               "displayName": "Altar",               "kind": "OBJECT" },
+  { "code": "WOODEN_DOOR",         "displayName": "Wooden Door",         "kind": "OBJECT" },
+  { "code": "CHAIN",               "displayName": "Chain",               "kind": "OBJECT" },
+  { "code": "CORPSE",              "displayName": "Corpse",              "kind": "OBJECT" },
+  { "code": "CRATE",               "displayName": "Crate",               "kind": "OBJECT" },
+
+  { "code": "UNSTABLE_CEILING",    "displayName": "Unstable Ceiling",    "kind": "HAZARD" },
+  { "code": "FIRE",                "displayName": "Fire",                "kind": "HAZARD" },
+  { "code": "PRESSURE_PLATE",      "displayName": "Pressure Plate",      "kind": "HAZARD" },
+  { "code": "COLLAPSING_FLOOR",    "displayName": "Collapsing Floor",    "kind": "HAZARD" },
+
+  { "code": "FERRYMAN_OF_ASH",     "displayName": "Ferryman of Ash",     "kind": "EVENT" },
+  { "code": "WOUNDED_PILGRIM",     "displayName": "Wounded Pilgrim",     "kind": "EVENT" },
+  { "code": "FALSE_BLESSING",      "displayName": "False Blessing",      "kind": "EVENT" },
+  { "code": "HIDDEN_PRAYER_SHARD", "displayName": "Hidden Prayer Shard", "kind": "EVENT" },
+  { "code": "RELIQUARY_BARGAIN",   "displayName": "Reliquary Bargain",   "kind": "EVENT" }
+]

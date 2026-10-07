@@ -1,0 +1,157 @@
+[
+  {
+    "code": "RUINED_NAVE",
+    "displayName": "Ruined Nave",
+    "zones": [
+      { "id": "nave_entrance", "displayName": "Nave Entrance" },
+      { "id": "central_aisle", "displayName": "Central Aisle" },
+      { "id": "collapsed_pews", "displayName": "Collapsed Pews" },
+      { "id": "apse", "displayName": "Apse" }
+    ],
+    "connections": [
+      { "id": "entrance_aisle", "zoneA": "nave_entrance", "zoneB": "central_aisle" },
+      { "id": "aisle_pews", "zoneA": "central_aisle", "zoneB": "collapsed_pews" },
+      { "id": "aisle_apse", "zoneA": "central_aisle", "zoneB": "apse" }
+    ],
+    "exitZones": ["nave_entrance", "apse"],
+    "slots": [
+      { "id": "pews", "kind": "OBJECT", "candidates": ["WOODEN_PEW"], "zones": ["central_aisle", "collapsed_pews"], "chance": 80, "hiddenChance": 0 },
+      { "id": "nave_altar", "kind": "OBJECT", "candidates": ["ALTAR"], "zones": ["apse"], "chance": 60, "hiddenChance": 0 },
+      { "id": "nave_enemy", "kind": "ENTITY", "candidates": ["HOLLOW_ACOLYTE", "ASHBOUND_PENITENT"], "zones": ["central_aisle", "collapsed_pews", "apse"], "chance": 50, "hiddenChance": 20 },
+      { "id": "nave_ceiling", "kind": "HAZARD", "candidates": ["UNSTABLE_CEILING"], "zones": ["collapsed_pews", "central_aisle"], "chance": 35, "hiddenChance": 50 },
+      { "id": "nave_event", "kind": "EVENT", "candidates": ["FALSE_BLESSING", "WOUNDED_PILGRIM"], "zones": ["apse", "nave_entrance"], "chance": 25, "hiddenChance": 0 }
+    ]
+  },
+  {
+    "code": "CLOISTER",
+    "displayName": "Cloister",
+    "zones": [
+      { "id": "cloister_walk", "displayName": "Cloister Walk" },
+      { "id": "overgrown_garth", "displayName": "Overgrown Garth" },
+      { "id": "broken_arcade", "displayName": "Broken Arcade" }
+    ],
+    "connections": [
+      { "id": "walk_garth", "zoneA": "cloister_walk", "zoneB": "overgrown_garth" },
+      { "id": "walk_arcade", "zoneA": "cloister_walk", "zoneB": "broken_arcade" },
+      { "id": "garth_arcade", "zoneA": "overgrown_garth", "zoneB": "broken_arcade" }
+    ],
+    "exitZones": ["cloister_walk", "broken_arcade"],
+    "slots": [
+      { "id": "arcade_pillar", "kind": "OBJECT", "candidates": ["STONE_PILLAR"], "zones": ["broken_arcade", "cloister_walk"], "chance": 70, "hiddenChance": 0 },
+      { "id": "garth_corpse", "kind": "OBJECT", "candidates": ["CORPSE"], "zones": ["overgrown_garth", "cloister_walk"], "chance": 40, "hiddenChance": 30 },
+      { "id": "cloister_enemy", "kind": "ENTITY", "candidates": ["HOLLOW_ACOLYTE"], "zones": ["overgrown_garth", "broken_arcade"], "chance": 55, "hiddenChance": 25 },
+      { "id": "arcade_floor", "kind": "HAZARD", "candidates": ["COLLAPSING_FLOOR"], "zones": ["broken_arcade"], "chance": 25, "hiddenChance": 60 },
+      { "id": "cloister_event", "kind": "EVENT", "candidates": ["WOUNDED_PILGRIM"], "zones": ["cloister_walk"], "chance": 20, "hiddenChance": 0 }
+    ]
+  },
+  {
+    "code": "SACRISTY",
+    "displayName": "Sacristy",
+    "zones": [
+      { "id": "vestry_door", "displayName": "Vestry Door" },
+      { "id": "vestment_racks", "displayName": "Vestment Racks" },
+      { "id": "locked_alcove", "displayName": "Locked Alcove" }
+    ],
+    "connections": [
+      { "id": "door_racks", "zoneA": "vestry_door", "zoneB": "vestment_racks" },
+      { "id": "racks_alcove", "zoneA": "vestment_racks", "zoneB": "locked_alcove" }
+    ],
+    "exitZones": ["vestry_door"],
+    "slots": [
+      { "id": "sacristy_crate", "kind": "OBJECT", "candidates": ["CRATE"], "zones": ["vestment_racks", "locked_alcove"], "chance": 70, "hiddenChance": 20 },
+      { "id": "alcove_chain", "kind": "OBJECT", "candidates": ["CHAIN"], "zones": ["locked_alcove"], "chance": 40, "hiddenChance": 0 },
+      { "id": "sacristy_enemy", "kind": "ENTITY", "candidates": ["ASHBOUND_PENITENT"], "zones": ["vestment_racks"], "chance": 35, "hiddenChance": 0 },
+      { "id": "sacristy_plate", "kind": "HAZARD", "candidates": ["PRESSURE_PLATE"], "zones": ["vestry_door", "locked_alcove"], "chance": 30, "hiddenChance": 80 },
+      { "id": "prayer_shard", "kind": "EVENT", "candidates": ["HIDDEN_PRAYER_SHARD"], "zones": ["locked_alcove", "vestment_racks"], "chance": 30, "hiddenChance": 100 }
+    ]
+  },
+  {
+    "code": "OSSUARY",
+    "displayName": "Ossuary",
+    "zones": [
+      { "id": "bone_stair", "displayName": "Bone Stair" },
+      { "id": "skull_niches", "displayName": "Skull Niches" },
+      { "id": "charnel_pit", "displayName": "Charnel Pit" },
+      { "id": "warden_post", "displayName": "Warden Post" }
+    ],
+    "connections": [
+      { "id": "stair_niches", "zoneA": "bone_stair", "zoneB": "skull_niches" },
+      { "id": "niches_pit", "zoneA": "skull_niches", "zoneB": "charnel_pit" },
+      { "id": "niches_post", "zoneA": "skull_niches", "zoneB": "warden_post" }
+    ],
+    "exitZones": ["bone_stair", "warden_post"],
+    "slots": [
+      { "id": "pit_corpse", "kind": "OBJECT", "candidates": ["CORPSE"], "zones": ["charnel_pit", "skull_niches"], "chance": 80, "hiddenChance": 0 },
+      { "id": "ossuary_warden", "kind": "ENTITY", "candidates": ["BONE_WARDEN"], "zones": ["warden_post", "charnel_pit"], "chance": 60, "hiddenChance": 15 },
+      { "id": "niche_lurker", "kind": "ENTITY", "candidates": ["HOLLOW_ACOLYTE"], "zones": ["skull_niches"], "chance": 30, "hiddenChance": 40 },
+      { "id": "pit_floor", "kind": "HAZARD", "candidates": ["COLLAPSING_FLOOR"], "zones": ["charnel_pit"], "chance": 30, "hiddenChance": 50 },
+      { "id": "ossuary_event", "kind": "EVENT", "candidates": ["FERRYMAN_OF_ASH"], "zones": ["bone_stair"], "chance": 20, "hiddenChance": 0 }
+    ]
+  },
+  {
+    "code": "BELL_PASSAGE",
+    "displayName": "Bell Passage",
+    "zones": [
+      { "id": "bell_landing", "displayName": "Bell Landing" },
+      { "id": "rope_gallery", "displayName": "Rope Gallery" },
+      { "id": "cracked_belfry", "displayName": "Cracked Belfry" }
+    ],
+    "connections": [
+      { "id": "landing_gallery", "zoneA": "bell_landing", "zoneB": "rope_gallery" },
+      { "id": "gallery_belfry", "zoneA": "rope_gallery", "zoneB": "cracked_belfry" }
+    ],
+    "exitZones": ["bell_landing", "cracked_belfry"],
+    "slots": [
+      { "id": "bell_chain", "kind": "OBJECT", "candidates": ["CHAIN"], "zones": ["rope_gallery", "cracked_belfry"], "chance": 70, "hiddenChance": 0 },
+      { "id": "belfry_ceiling", "kind": "HAZARD", "candidates": ["UNSTABLE_CEILING"], "zones": ["cracked_belfry", "rope_gallery"], "chance": 45, "hiddenChance": 40 },
+      { "id": "passage_enemy", "kind": "ENTITY", "candidates": ["HOLLOW_ACOLYTE", "BONE_WARDEN"], "zones": ["bell_landing", "rope_gallery"], "chance": 45, "hiddenChance": 20 },
+      { "id": "bell_event", "kind": "EVENT", "candidates": ["FALSE_BLESSING"], "zones": ["bell_landing"], "chance": 15, "hiddenChance": 0 }
+    ]
+  },
+  {
+    "code": "RELIQUARY",
+    "displayName": "Reliquary",
+    "zones": [
+      { "id": "reliquary_gate", "displayName": "Reliquary Gate" },
+      { "id": "relic_shelves", "displayName": "Relic Shelves" },
+      { "id": "sealed_reliquary", "displayName": "Sealed Reliquary" },
+      { "id": "side_chapel", "displayName": "Side Chapel" }
+    ],
+    "connections": [
+      { "id": "gate_shelves", "zoneA": "reliquary_gate", "zoneB": "relic_shelves" },
+      { "id": "shelves_sealed", "zoneA": "relic_shelves", "zoneB": "sealed_reliquary" },
+      { "id": "shelves_side", "zoneA": "relic_shelves", "zoneB": "side_chapel" }
+    ],
+    "exitZones": ["reliquary_gate", "side_chapel"],
+    "slots": [
+      { "id": "side_altar", "kind": "OBJECT", "candidates": ["ALTAR"], "zones": ["side_chapel"], "chance": 60, "hiddenChance": 0 },
+      { "id": "shelf_clutter", "kind": "OBJECT", "candidates": ["CRATE", "CORPSE"], "zones": ["relic_shelves", "sealed_reliquary"], "chance": 60, "hiddenChance": 25 },
+      { "id": "reliquary_enemy", "kind": "ENTITY", "candidates": ["ASHBOUND_PENITENT", "HOLLOW_ACOLYTE"], "zones": ["relic_shelves", "side_chapel"], "chance": 45, "hiddenChance": 20 },
+      { "id": "chapel_fire", "kind": "HAZARD", "candidates": ["FIRE"], "zones": ["side_chapel", "relic_shelves"], "chance": 30, "hiddenChance": 0 },
+      { "id": "bargain_event", "kind": "EVENT", "candidates": ["RELIQUARY_BARGAIN"], "zones": ["sealed_reliquary"], "chance": 35, "hiddenChance": 0 }
+    ]
+  },
+  {
+    "code": "GUARDIAN_SANCTUM",
+    "displayName": "Guardian Sanctum",
+    "zones": [
+      { "id": "sanctum_threshold", "displayName": "Sanctum Threshold" },
+      { "id": "guardian_dais", "displayName": "Guardian Dais" },
+      { "id": "pillared_flank", "displayName": "Pillared Flank" },
+      { "id": "ember_choir", "displayName": "Ember Choir" }
+    ],
+    "connections": [
+      { "id": "threshold_dais", "zoneA": "sanctum_threshold", "zoneB": "guardian_dais" },
+      { "id": "threshold_flank", "zoneA": "sanctum_threshold", "zoneB": "pillared_flank" },
+      { "id": "dais_flank", "zoneA": "guardian_dais", "zoneB": "pillared_flank" },
+      { "id": "dais_choir", "zoneA": "guardian_dais", "zoneB": "ember_choir" }
+    ],
+    "exitZones": ["sanctum_threshold"],
+    "slots": [
+      { "id": "guardian", "kind": "ENTITY", "candidates": ["CHAPEL_GUARDIAN"], "zones": ["guardian_dais"], "chance": 100, "hiddenChance": 0 },
+      { "id": "sanctum_pillars", "kind": "OBJECT", "candidates": ["STONE_PILLAR"], "zones": ["pillared_flank"], "chance": 80, "hiddenChance": 0 },
+      { "id": "choir_fire", "kind": "HAZARD", "candidates": ["FIRE"], "zones": ["ember_choir", "guardian_dais"], "chance": 50, "hiddenChance": 0 },
+      { "id": "flank_floor", "kind": "HAZARD", "candidates": ["COLLAPSING_FLOOR"], "zones": ["pillared_flank", "ember_choir"], "chance": 30, "hiddenChance": 0 }
+    ]
+  }
+]

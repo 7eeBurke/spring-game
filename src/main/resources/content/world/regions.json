@@ -1,0 +1,12 @@
+[
+  {
+    "code": "HOLLOW_CHAPEL",
+    "displayName": "Hollow Chapel",
+    "normalArchetypes": ["RUINED_NAVE", "CLOISTER", "SACRISTY", "OSSUARY", "BELL_PASSAGE", "RELIQUARY"],
+    "bossArchetype": "GUARDIAN_SANCTUM",
+    "bossEntity": "CHAPEL_GUARDIAN",
+    "requiredScenes": { "min": 5, "max": 7 },
+    "optionalScenes": { "min": 0, "max": 2 },
+    "branches": { "min": 1, "max": 2 }
+  }
+]
