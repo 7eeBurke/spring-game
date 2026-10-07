@@ -16,11 +16,13 @@ Build a dark-fantasy roguelike in Java/Spring Boot where natural language gives 
 
 ## ActionIntent
 
-Top-level conceptual fields:
+The exact contract is specified in `AI_CONTRACTS.md` (schema version 1).
+
+Top-level fields:
 - `schemaVersion`
-- optional `responseToAttackId`
-- `steps[]`
-- `interpretationConfidence`
+- optional `responseToAttack` (the only place an incoming attack is referenced)
+- `steps[]` (1-based sequence, in list order)
+- `confidence`
 - `unresolvedReferences[]`
 
 Supported V1 action types:
@@ -42,6 +44,20 @@ Steps are ordered and may relate to the previous step using:
 `WHILE` represents genuinely simultaneous actions and is subject to the simultaneous-action complexity rules (see `GAME_RULES.md`). Exact `WHILE` resolution semantics are deferred to the action-resolution stage (see `DEFERRED_DECISIONS.md`).
 
 The AI may normalize language but may not output rolls, DCs, damage, trauma, success, injuries or new world facts.
+
+### Action Boundary
+
+```
+player text → (future) Action Interpreter → ActionIntent
+            → ActionValidator (PlayerSceneView + owned references + known incoming attacks)
+            → (Stage 11) action resolution → ResolvedOutcome → persistence → narration
+```
+
+- `action` holds the contract: `ActionIntent`, steps, the sealed payloads and targets, and the vocabulary enums. The action type is derived from the payload.
+- `action.validation` holds `ActionValidationContext`, `PlayerActionReferences`, `ActionValidator`, the result model and the `PhysicalPlausibilityPolicy` seam.
+- Validation consults only the player-safe view and the player's current opaque references: never `SceneState`, hidden content, scene or exit-destination identities, or persistence. Unknown and hidden scene references are indistinguishable, so validation errors cannot leak hidden state.
+- Owned weapons, abilities and items are referenced by opaque per-context references, not definition codes or persistent instance IDs.
+- Validation never chooses stats, DCs or suitability, never rolls, and never mutates the intent. Both packages are pure Java.
 
 ## ResolvedOutcome
 
@@ -91,7 +107,8 @@ Feature-oriented packages under the base package `com.leeburke.springgame`, grow
   - `content.world` — authored world-generation content (world elements, scene archetypes, regions, fixed scenes) and its catalogue/loader
 - `character` — character generation and character state
 - `mechanics` — checks, DCs, suitability, damage, trauma
-- `action` — `ActionIntent`, validation, step resolution, `ResolvedOutcome`
+- `action` — the `ActionIntent` contract (steps, payloads, targets, vocabulary); step resolution and `ResolvedOutcome` later
+  - `action.validation` — deterministic validation of an intent against the player-safe view and owned references
 - `combat`
 - `enemy`
 - `world` — region and scene instances, `SceneState` and its integrity rules, `PlayerLocation` (pure Java; region generation will live alongside later)

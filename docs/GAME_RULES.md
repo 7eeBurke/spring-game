@@ -191,6 +191,42 @@ Several defenses may be viable for the same attack. Suitability is derived from 
 `TAKE_COVER` is a `DefenseMethod` only: an immediate defensive response to an incoming attack.
 Proactive movement toward cover is `MovementType.REPOSITION` with `relativeGoal = COVER`. `TAKE_COVER` is not a `MovementType`.
 
+Parry contact points: `UNSPECIFIED`, `WEAPON`, `WEAPON_HEAD`, `SHAFT`, `BLADE`, `ATTACKING_ARM`.
+
+## Action Vocabulary
+
+The canonical vocabulary of the action contract (see `AI_CONTRACTS.md`). These values express intent only; how they are resolved is decided by Java action resolution.
+
+Action types: `ATTACK`, `DEFEND`, `MOVE`, `INTERACT`, `OBSERVE`, `USE_ABILITY`, `USE_ITEM`, `COMMUNICATE`.
+
+Step relations: `START`, `THEN`, `IF_PREVIOUS_SUCCEEDS`, `WHILE`.
+
+Approach (the one dominant physical approach of an attack, movement or interaction): `NORMAL`, `PRECISE`, `FORCEFUL`, `CAUTIOUS`, `QUICK`, `STEALTHY`, `RUSHED`, `ACROBATIC`.
+
+Attack purpose: `DAMAGE`, `DISARM`, `TRIP`, `PUSH`, `PULL`, `BREAK`, `IGNITE`, `EXTINGUISH`, `CREATE_DISTANCE`, `CLOSE_DISTANCE`, `REPOSITION`, `ESCAPE`, `RESTRAIN`, `DISTRACT`, `DEFEND`.
+
+Attacks use the methods and templates listed under Weapons and always use an owned weapon. Unarmed attacks (punches, kicks) are not part of the current vocabulary; their method, template, damage and trauma are deferred.
+
+Movement types: `ADVANCE`, `RETREAT`, `CLOSE_DISTANCE`, `REPOSITION`, `CIRCLE`, `CLIMB`, `DISENGAGE`, `HOLD_POSITION`. Relative goal: `NONE`, `COVER`.
+
+| Intent | Representation |
+|---|---|
+| Move to a known zone | `ADVANCE` or `REPOSITION` with a zone target |
+| Move through a known exit | `ADVANCE` with an exit target (`RETREAT` or `DISENGAGE` to back out or escape) |
+| Reposition relative to an entity or object | `REPOSITION` or `CIRCLE` with that target |
+| Close distance | `CLOSE_DISTANCE` with an entity or object target |
+| Create distance | `RETREAT` |
+| Move into cover | `REPOSITION` with goal `COVER`, optionally naming the covering object |
+| Escape | `DISENGAGE` |
+
+Movement vocabulary implies no range-band changes or movement costs; those belong to action resolution.
+
+Interactions: `PUSH`, `PULL`, `BREAK`, `OPEN`, `CLOSE`, `PICK_UP`, `DROP`, `PLACE`, `JAM`, `IGNITE`, `EXTINGUISH`.
+
+Observation: `SEARCH`, `INSPECT`, `LISTEN`, `WATCH`. (`TRACK` is not part of the MVP.)
+
+Communication: `SAY`, `ASK`, `THREATEN`, `PERSUADE`, `DECEIVE`, `BARGAIN`.
+
 ## Position and Range
 
 Range bands:

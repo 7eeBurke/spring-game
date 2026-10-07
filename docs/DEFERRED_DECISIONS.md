@@ -17,8 +17,13 @@ If a stage requires one of these, flag it and get a decision before implementing
 - Effectiveness determination (weapon/damage type vs target). The levels and their multipliers are defined in `GAME_RULES.md`; only how a level is chosen is deferred.
 - Attack-form modifier values for trauma (for example deep-cut, penetrating, crushing forms) and how a form is derived.
 - Anatomy interaction modifier values for trauma.
-- Exact `WHILE` resolution semantics (beyond: genuinely simultaneous, subject to simultaneous-action complexity).
+- Exact `WHILE` resolution semantics (beyond: genuinely simultaneous, subject to simultaneous-action complexity), and how `THEN` and `IF_PREVIOUS_SUCCEEDS` treat each degree of success, interruption and cancellation.
 - Detailed social (`COMMUNICATE`) resolution rules.
+- Suitability determination and stat selection for an action in context.
+- Movement resolution: zone reachability, range-band changes and movement costs (and the `ZONE_NOT_REACHABLE` validation code).
+- Combat timing and response-to-attack execution, including what a `DEFEND` step means with no incoming attack.
+- Physical-plausibility rules: which actions are provably impossible (the validation seam exists; the baseline proves nothing impossible).
+- Unarmed attacks (punches, kicks): method, template, damage and trauma. They are not part of the current action vocabulary.
 
 ## Body, Conditions and Recovery
 
@@ -30,13 +35,13 @@ If a stage requires one of these, flag it and get a decision before implementing
 ## Enemies
 
 - Exact enemy numbers: stats, HP, protection.
-- Enemy anatomy (which body parts each enemy has).
+- Enemy anatomy (which body parts each enemy has), and the `BODY_PART_NOT_PRESENT` validation code.
 - Enemy utility weights.
 
 ## Content Mechanics
 
 - Passive effects.
-- Ability effects (beyond prototype ~2 uses per run).
+- Ability effects (beyond prototype ~2 uses per run), charges and the `ABILITY_NO_USES` validation code.
 - Utility tool effects.
 - Hazard mechanics.
 - Event mechanics and Fated variations.
@@ -73,4 +78,7 @@ If a stage requires one of these, flag it and get a decision before implementing
 ## Presentation and Contracts
 
 - Run summary contents.
-- Entity/object ID format exposed to AI roles. `PlayerSceneView` currently exposes scene-local IDs and never UUIDs (no scene, exit-destination or run identities); the final AI-facing format is still undecided.
+- Entity/object ID format exposed to AI roles.
+- How opaque player-owned action references (weapons, abilities, items) are minted and presented to the Action Interpreter; the validation contract accepts any non-blank opaque references.
+- AI provider integration and structured-output schema/JSON codec for `ActionIntent`, including interpreter-side `ACTION_NOT_SUPPORTED` / `INTERPRETATION_FAILED` handling.
+- Action history persistence. `PlayerSceneView` currently exposes scene-local IDs and never UUIDs (no scene, exit-destination or run identities); the final AI-facing format is still undecided.
