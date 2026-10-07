@@ -32,13 +32,13 @@ class GameContentCatalogTest {
 	}
 
 	private static GameContentCatalog weaponsOnly(List<WeaponDefinition> weapons) {
-		return new GameContentCatalog(weapons, List.of(), List.of(), List.of());
+		return new GameContentCatalog(weapons, List.of(), List.of(), List.of(), List.of());
 	}
 
 	@Test
 	void findsDefinitionsByCode() {
 		GameContentCatalog catalog = new GameContentCatalog(
-				List.of(weapon("CLUB")), List.of(passive("STEADY")), List.of(ability("BLINK")), List.of(item("ROPE")));
+				List.of(weapon("CLUB")), List.of(passive("STEADY")), List.of(ability("BLINK")), List.of(item("ROPE")), List.of("Aldric"));
 
 		assertThat(catalog.findWeapon("CLUB")).contains(weapon("CLUB"));
 		assertThat(catalog.findPassive("STEADY")).contains(passive("STEADY"));
@@ -62,23 +62,23 @@ class GameContentCatalogTest {
 	@Test
 	void duplicateCodesWithinEachTypeAreRejected() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new GameContentCatalog(List.of(weapon("CLUB"), weapon("CLUB")), List.of(), List.of(), List.of()))
+				.isThrownBy(() -> new GameContentCatalog(List.of(weapon("CLUB"), weapon("CLUB")), List.of(), List.of(), List.of(), List.of()))
 				.withMessageContaining("weapon").withMessageContaining("CLUB");
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new GameContentCatalog(List.of(), List.of(passive("CALM"), passive("CALM")), List.of(), List.of()))
+				.isThrownBy(() -> new GameContentCatalog(List.of(), List.of(passive("CALM"), passive("CALM")), List.of(), List.of(), List.of()))
 				.withMessageContaining("passive").withMessageContaining("CALM");
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new GameContentCatalog(List.of(), List.of(), List.of(ability("BLINK"), ability("BLINK")), List.of()))
+				.isThrownBy(() -> new GameContentCatalog(List.of(), List.of(), List.of(ability("BLINK"), ability("BLINK")), List.of(), List.of()))
 				.withMessageContaining("ability").withMessageContaining("BLINK");
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new GameContentCatalog(List.of(), List.of(), List.of(), List.of(item("ROPE"), item("ROPE"))))
+				.isThrownBy(() -> new GameContentCatalog(List.of(), List.of(), List.of(), List.of(item("ROPE"), item("ROPE")), List.of()))
 				.withMessageContaining("item").withMessageContaining("ROPE");
 	}
 
 	@Test
 	void sameCodeInDifferentTypesIsAllowed() {
 		GameContentCatalog catalog = new GameContentCatalog(
-				List.of(weapon("EMBER")), List.of(passive("EMBER")), List.of(ability("EMBER")), List.of(item("EMBER")));
+				List.of(weapon("EMBER")), List.of(passive("EMBER")), List.of(ability("EMBER")), List.of(item("EMBER")), List.of());
 		assertThat(catalog.findWeapon("EMBER")).isPresent();
 		assertThat(catalog.findAbility("EMBER")).isPresent();
 	}
@@ -93,7 +93,7 @@ class GameContentCatalogTest {
 
 	@Test
 	void emptyCatalogIsValid() {
-		GameContentCatalog catalog = new GameContentCatalog(List.of(), List.of(), List.of(), List.of());
+		GameContentCatalog catalog = new GameContentCatalog(List.of(), List.of(), List.of(), List.of(), List.of());
 		assertThat(catalog.weapons()).isEmpty();
 		assertThat(catalog.passives()).isEmpty();
 		assertThat(catalog.abilities()).isEmpty();
@@ -109,11 +109,64 @@ class GameContentCatalogTest {
 	@Test
 	void returnedListsAreUnmodifiable() {
 		GameContentCatalog catalog = new GameContentCatalog(
-				List.of(weapon("CLUB")), List.of(passive("CALM")), List.of(ability("BLINK")), List.of(item("ROPE")));
+				List.of(weapon("CLUB")), List.of(passive("CALM")), List.of(ability("BLINK")), List.of(item("ROPE")), List.of("Aldric"));
 		assertThatThrownBy(() -> catalog.weapons().add(weapon("AXE"))).isInstanceOf(UnsupportedOperationException.class);
 		assertThatThrownBy(() -> catalog.passives().clear()).isInstanceOf(UnsupportedOperationException.class);
 		assertThatThrownBy(() -> catalog.abilities().clear()).isInstanceOf(UnsupportedOperationException.class);
 		assertThatThrownBy(() -> catalog.items().clear()).isInstanceOf(UnsupportedOperationException.class);
+		assertThatThrownBy(() -> catalog.characterNames().add("Bram")).isInstanceOf(UnsupportedOperationException.class);
+	}
+
+	// --- Character names ---
+
+	private static GameContentCatalog namesOnly(List<String> names) {
+		return new GameContentCatalog(List.of(), List.of(), List.of(), List.of(), names);
+	}
+
+	@Test
+	void namesKeepAuthoredOrderExactlyAsAuthored() {
+		assertThat(namesOnly(List.of("Wren", "Aldric", "McCorvin")).characterNames())
+				.containsExactly("Wren", "Aldric", "McCorvin");
+	}
+
+	@Test
+	void emptyNamePoolIsValid() {
+		assertThat(namesOnly(List.of()).characterNames()).isEmpty();
+	}
+
+	@Test
+	void blankNamesAreRejected() {
+		assertThatIllegalArgumentException().isThrownBy(() -> namesOnly(List.of("")));
+		assertThatIllegalArgumentException().isThrownBy(() -> namesOnly(List.of("   ")));
+	}
+
+	@Test
+	void nullNameIsRejected() {
+		assertThatNullPointerException().isThrownBy(() -> namesOnly(Arrays.asList("Aldric", null)));
+	}
+
+	@Test
+	void untrimmedNamesAreRejectedNotNormalised() {
+		assertThatIllegalArgumentException().isThrownBy(() -> namesOnly(List.of(" Aldric")));
+		assertThatIllegalArgumentException().isThrownBy(() -> namesOnly(List.of("Aldric ")));
+	}
+
+	@Test
+	void duplicateNamesAreRejectedIgnoringCase() {
+		assertThatIllegalArgumentException().isThrownBy(() -> namesOnly(List.of("Aldric", "Aldric")))
+				.withMessageContaining("Aldric");
+		assertThatIllegalArgumentException().isThrownBy(() -> namesOnly(List.of("Aldric", "aldric")))
+				.withMessageContaining("aldric");
+	}
+
+	@Test
+	void doesNotRetainCallerNameCollection() {
+		List<String> source = new ArrayList<>(List.of("Aldric"));
+		GameContentCatalog catalog = namesOnly(source);
+
+		source.add("Bram");
+
+		assertThat(catalog.characterNames()).containsExactly("Aldric");
 	}
 
 	@Test

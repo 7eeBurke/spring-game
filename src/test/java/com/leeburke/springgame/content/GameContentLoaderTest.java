@@ -78,7 +78,39 @@ class GameContentLoaderTest {
 		assertThat(bundled.findItem(code)).contains(new ItemDefinition(code, name, category));
 	}
 
+	@Test
+	void bundledCharacterNamesAreLoaded() {
+		assertThat(bundled.characterNames()).hasSize(26)
+				.contains("Aldric", "Yorick")
+				.allSatisfy(name -> assertThat(name).isNotBlank());
+	}
+
 	// --- Strict loading, using test fixtures rather than production content. ---
+
+	@Test
+	void nonStringNameFails() {
+		String path = FIXTURES + "/names-not-strings.json";
+		assertThatThrownBy(() -> new GameContentLoader(FIXTURES).readDefinitions(path, String.class))
+				.isInstanceOf(ContentLoadException.class)
+				.hasMessageContaining(path);
+	}
+
+	@Test
+	void caseInsensitiveDuplicateNameFailsFullLoad() {
+		String directory = FIXTURES + "/duplicate-name";
+		assertThatThrownBy(() -> new GameContentLoader(directory).load())
+				.isInstanceOf(ContentLoadException.class)
+				.hasMessageContaining(directory)
+				.hasMessageContaining("aldric");
+	}
+
+	@Test
+	void missingNamesResourceFailsClearly() {
+		assertThatThrownBy(() -> new GameContentLoader(FIXTURES + "/missing-names").load())
+				.isInstanceOf(ContentLoadException.class)
+				.hasMessageContaining("Missing required content resource")
+				.hasMessageContaining("character-names.json");
+	}
 
 	@ParameterizedTest
 	@ValueSource(strings = {

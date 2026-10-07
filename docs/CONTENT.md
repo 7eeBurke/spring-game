@@ -14,8 +14,9 @@ Location: `src/main/resources/content/`
 | `passives.json` | `PassiveDefinition` |
 | `abilities.json` | `AbilityDefinition` |
 | `items.json` | `ItemDefinition` |
+| `character-names.json` | character name pool (strings) |
 
-Each file is a top-level JSON array of objects. Authored order is preserved for deterministic iteration and inspection; it carries no selection meaning. Content-selection rules are deferred (see `DEFERRED_DECISIONS.md`).
+Each definition file is a top-level JSON array of objects; `character-names.json` is a top-level JSON array of strings. Authored order is preserved for deterministic iteration and inspection; it carries no selection meaning. Character generation currently selects uniformly within each pool (see `CHARACTER_GENERATION.md`); weighted selection rules are deferred (see `DEFERRED_DECISIONS.md`).
 
 ## Definition Codes
 
@@ -58,6 +59,16 @@ The primary damage type is content identity only. Which damage an individual att
 | `displayName` | string | not blank |
 | `category` | `ItemCategory` | `RECOVERY`, `UTILITY` |
 
+### Character Names
+
+`character-names.json` is an array of strings. Each name:
+- is a JSON string (numbers or booleans are not converted);
+- is not blank;
+- has no leading or trailing whitespace (names are rejected, never trimmed);
+- is unique ignoring case, so `Aldric` and `aldric` cannot both appear and silently double a choice's probability.
+
+Names are stored exactly as authored. Adding a name is a JSON-only change.
+
 ## Loading Rules
 
 Loading fails, naming the resource, for:
@@ -67,10 +78,12 @@ Loading fails, naming the resource, for:
 - an unknown (for example misspelled) field;
 - an unknown enum value (enum values are case-sensitive);
 - a string where a number is expected, or a fractional number for an integer field;
+- a number or boolean where a string is expected;
 - a key repeated within one object;
 - a blank display name or an invalid code;
 - negative weapon base damage or trauma;
-- a duplicate code within one content type.
+- a duplicate code within one content type;
+- a blank, untrimmed or case-insensitively duplicated character name.
 
 ## Adding Content
 
@@ -122,6 +135,12 @@ Reproducing a run from `runSeed` + `generationContextSnapshot` assumes the same 
 | `TORCH` | Torch | `UTILITY` |
 | `CROWBAR` | Crowbar | `UTILITY` |
 | `LOCKPICKS` | Lockpicks | `UTILITY` |
+
+### Character Names
+
+26 names:
+
+Aldric, Bram, Cael, Corvin, Dagny, Edric, Elske, Garrow, Hesk, Ilse, Isolde, Joren, Kestrel, Lorne, Maren, Morwen, Nyle, Oswin, Perrin, Rook, Sabine, Tamsin, Ulric, Vesna, Wren, Yorick
 
 ## Not Yet Defined
 

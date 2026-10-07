@@ -41,13 +41,13 @@ If a stage requires one of these, flag it and get a decision before implementing
 - Hazard mechanics.
 - Event mechanics and Fated variations.
 - Rare Fated starting modifications.
+- Fated consequences: use of the qualitative bands, rare events, enemy variants, rewards (only the numeric value is generated and stored).
 - Weapon definition extensions: supported attack methods, suitability, tags, handedness, stat affinities, attack-form modifiers.
 - Runtime item/weapon instance ID format (distinct from static definition codes).
 
 ## Generation
 
-- Content weights: weapon affinity, passive, ability, starting items, loadout coherence effects.
-- Name generation source.
+- Starting-content weighting: weapon stat affinity, passive/ability/item weighting, loadout coherence (`LOW`/`MEDIUM`/`HIGH`) and its effects, redundancy weighting. Character generation currently uses uniform independent selection within each pool as a baseline; this is not a decision to drop weighting.
 - Scene-role → archetype compatibility.
 - Scene content budgets.
 - Boss-gate progression route mechanics.

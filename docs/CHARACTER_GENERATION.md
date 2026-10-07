@@ -4,7 +4,7 @@
 
 A run starts by creating a mechanical character in Java, then asking the introduction narrator to render a short background from those confirmed facts.
 
-Conceptual fields:
+Fields:
 - name
 - five stats
 - Fated
@@ -16,7 +16,17 @@ Conceptual fields:
 - one utility tool
 - five-slot tool belt
 - body state
-- narrative-safe derived traits
+- narrative-safe derived traits (later)
+
+### Model vs Generation Policy
+
+The generated-character model enforces structural validity only:
+- every field present, a non-blank name;
+- max HP at least 1, and a new character at full health (current HP = max HP);
+- every body part has exactly one severity;
+- a starting tool belt holding exactly one weapon, one recovery item and one utility item.
+
+The exact V1 generation policy (the HP formula, an all-healthy body, the Fated distribution, uniform selection) belongs to the generator, not the model. The model can therefore represent, for example, a non-healthy body part or a different max HP, leaving room for rare Fated starting modifications without a model change.
 
 ## Stat Budget
 
@@ -55,7 +65,8 @@ A 10 should be genuinely uncommon and meaningful.
 
 Separate from stat points.
 Range 0–5.
-Suggested starting distribution:
+
+V1 starting distribution:
 - 0: 25%
 - 1: 25%
 - 2: 22%
@@ -63,11 +74,21 @@ Suggested starting distribution:
 - 4: 9%
 - 5: 4%
 
+Fated is drawn with one integer roll in `[0, 100)`:
+- 0–24 → 0
+- 25–49 → 1
+- 50–71 → 2
+- 72–86 → 3
+- 87–95 → 4
+- 96–99 → 5
+
+Fated is independent of the stat-profile roll: the Fated rule takes no stat input.
+
 Fated is not luck. Higher Fated increases unusual/consequential events, whether beneficial, harmful or mixed.
 
-Keep Fated independent of the stat-profile roll.
-
 Fated is visible to the player as a 0–5 character attribute. The internal Fated probabilities and how Fated influences generation remain hidden.
+
+Character generation currently stores only the numeric value. Fated consequences, including use of the qualitative bands below, are deferred (see `DEFERRED_DECISIONS.md`).
 
 Qualitative narration bands may be:
 - 0 `ORDINARY`
@@ -78,12 +99,29 @@ Qualitative narration bands may be:
 
 ## HP
 
-Prototype starting point:
-- base HP ~26
-- Resolve contributes a small modifier using the same -3..+4 stat modifier scale
-- expected ordinary range roughly 23–30
+V1 starting maximum HP:
+
+`maxHp = 26 + (Resolve - 6)`
+
+Resolve 3 to 10 gives max HP 23 to 30. This is a character-generation rule of its own; it is not derived from the check stat-modifier table, even though the numbers currently line up.
+
+A new character starts at full health: `currentHp = maxHp`.
 
 Resolve must not become the sole dominant survivability stat; its main identity remains composure/will.
+
+## Current Selection Policy
+
+Starting content is selected from the static content catalogue (see `CONTENT.md`):
+- one weapon from all weapons;
+- one passive from all passives;
+- one ability from all abilities;
+- one recovery item from items with category `RECOVERY`;
+- one utility item from items with category `UTILITY`;
+- one name from the character-name pool.
+
+Each choice is currently **uniform and independent** within its pool. This is a baseline: the weapon affinity, loadout coherence and redundancy weighting described below are designed intent that is **not yet applied**. Their actual weighting rules are deferred (see `DEFERRED_DECISIONS.md`).
+
+Generation fails clearly if the supplied content cannot satisfy any of these pools.
 
 ## Starting Weapon
 
@@ -93,7 +131,7 @@ MVP pool:
 - War Hammer
 - Ember Rod
 
-Use weighted randomness, not hard matching.
+Designed intent (not yet applied): use weighted randomness, not hard matching.
 Suggested affinity direction:
 - Longsword: Agility primary, Might secondary
 - Dagger: Agility primary, Perception secondary
@@ -104,7 +142,7 @@ All valid weapons retain a non-zero base chance unless a true mechanical incompa
 
 ## Loadout Coherence
 
-Hidden generation variable:
+Designed intent (not yet applied). Hidden generation variable:
 - `LOW` ~20%
 - `MEDIUM` ~60%
 - `HIGH` ~20%
@@ -124,7 +162,7 @@ Initial MVP pool:
 - `IMPROVISER`
 - `ASH_TOUCHED`
 
-Passives should not always reinforce the strongest stat. Prefer a mixture of:
+Designed intent (not yet applied): passives should not always reinforce the strongest stat. Prefer a mixture of:
 - reinforcing;
 - compensating;
 - sideways/new-option passives.
@@ -138,17 +176,19 @@ Initial pool:
 - `SHADOW_STEP`
 - `WARDING_SIGIL`
 
-Abilities use loose stat affinity, not hard class locking.
+Abilities use loose stat affinity, not hard class locking (not yet applied).
 Prototype limited uses may be ~2 per run until balanced.
 
 ## Tool Belt
 
 Capacity: 5 slots.
-Start with:
+A new character starts with:
 - weapon (1 slot)
-- one recovery item
-- one utility tool
+- one recovery item (1 slot)
+- one utility tool (1 slot)
 - two empty slots
+
+The passive and active ability do not occupy tool-belt slots.
 
 Recovery pool:
 - Bandage
@@ -160,12 +200,32 @@ Utility pool:
 - Crowbar
 - Lockpicks
 
-Avoid strong redundancy through mild weighting, not hard bans.
+Designed intent (not yet applied): avoid strong redundancy through mild weighting, not hard bans.
+
+## Name
+
+The name is chosen uniformly from the curated pool in `src/main/resources/content/character-names.json` (see `CONTENT.md`). Adding a name is a JSON-only change.
 
 ## Initial Body State
 
 All normal body parts start `HEALTHY`.
 Rare Fated starting modifications may later alter this, but should not be routine or purely punitive.
+
+## Reproducibility
+
+Generation takes one caller-supplied random source and draws in this fixed order:
+1. stat profile, shape and shuffle;
+2. Fated;
+3. weapon;
+4. passive;
+5. ability;
+6. recovery item;
+7. utility item;
+8. name.
+
+HP and the initial body state involve no randomness. Changing the draw order changes seeded results.
+
+The same seed reproduces the same character only with the same game-rules and static-content version (see `CONTENT.md`).
 
 ## Character Introduction
 
@@ -179,12 +239,14 @@ Generation flow:
 7. select ability;
 8. select starting items;
 9. initialise body state;
-10. apply rare valid Fated start modifications;
-11. generate/select name;
+10. apply rare valid Fated start modifications (deferred);
+11. select name;
 12. persist character;
 13. build `CharacterIntroductionContext`;
 14. call narrator;
 15. persist introduction;
 16. present introduction + character sheet + first scene.
+
+Steps 2–9 and 11 are implemented as in-memory generation. Persistence, the introduction context and narration come later.
 
 The introduction should be brief dark-fantasy prose, usually second person, using soft memories/background rather than binding world-state facts.
