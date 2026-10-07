@@ -193,6 +193,8 @@ Proactive movement toward cover is `MovementType.REPOSITION` with `relativeGoal 
 
 Parry contact points: `UNSPECIFIED`, `WEAPON`, `WEAPON_HEAD`, `SHAFT`, `BLADE`, `ATTACKING_ARM`.
 
+How a defense is rolled and what gets through is described under Action Resolution.
+
 ## Action Vocabulary
 
 The canonical vocabulary of the action contract (see `AI_CONTRACTS.md`). These values express intent only; how they are resolved is decided by Java action resolution.
@@ -308,6 +310,8 @@ Existing injury modifier:
 - wounded +2
 - crippled +3
 
+The existing-injury modifier for a `DESTROYED` part is undefined (deferred). A defense against an attack aimed at a destroyed part is reported as mechanics-unavailable rather than guessed.
+
 Trauma is only calculated when contact occurred. `ContactQuality.NONE` means no impact: there is no contact modifier, no trauma score and no `ImpactSeverity`.
 
 When contact occurred, the raw trauma score is preserved as calculated (it may be negative after protection and mitigation). The effective score is `max(0, raw score)`, and the thresholds below apply to the effective score. There is no upper limit.
@@ -327,3 +331,97 @@ Examples:
 - poison requires toxin delivery rather than generic impact.
 
 `DESTROYED` should be rare and generally require a severely damaged part plus devastating/catastrophic trauma.
+
+## Action Resolution
+
+Java resolves a validated `ActionIntent` into a `ResolvedOutcome` (see `ARCHITECTURE.md`). Every rolled check is a Stage 3 check (`d20 + stat modifier` vs final DC), and every hit uses the Damage and Trauma rules above; resolution never repeats that arithmetic.
+
+### What resolves now
+
+| Action | Rolled | Stat | Base DC | Result |
+|---|---|---|---|---|
+| `ATTACK` with purpose `DAMAGE` on a visible creature | yes | by weapon method (below) | the target's combat profile | contact, damage, trauma |
+| `DEFEND` against the intent's incoming attack | yes | by defense method (below) | the incoming attack's difficulty | incoming contact, damage, trauma |
+| `MOVE` (`ADVANCE`/`REPOSITION`) to a zone | no | — | — | automatic (see Movement below) |
+| `MOVE` `HOLD_POSITION` | no | — | — | automatic success, no movement |
+| `COMMUNICATE` | no | — | — | automatic success: the words were said, with no social consequence |
+
+Everything else is a valid action whose mechanics are not designed yet. It is reported as **mechanics-unavailable**: no roll, no effect, and not a failure. This covers:
+- attacks on objects or hazards, and attacks with any purpose other than `DAMAGE`;
+- movement through exits, relative to entities or objects, or into cover, and `CLOSE_DISTANCE`, `RETREAT`, `CIRCLE`, `CLIMB` and `DISENGAGE`;
+- `INTERACT`, `OBSERVE`, `USE_ABILITY` and `USE_ITEM`.
+
+### Attack stat by weapon method
+
+| Method | Stat | Basis (Core Stats) |
+|---|---|---|
+| `SLASH`, `THRUST`, `HOOK` | `AGILITY` | finesse attacks |
+| `SMASH`, `POMMEL_STRIKE` | `MIGHT` | heavy physical actions |
+| `PROJECT` | `ARCANA` | controlling supernatural force |
+
+### Defense resolution
+
+| Method | Stat | Basis (Core Stats) |
+|---|---|---|
+| `EVADE`, `PARRY`, `TAKE_COVER` | `AGILITY` | dodging, parries, reflexes |
+| `BLOCK`, `BRACE` | `MIGHT` | blocks and bracing |
+
+The DC is the difficulty the backend supplied with the incoming attack. The defender's degree decides how the attack connects:
+
+| Defender's degree | Incoming contact |
+|---|---|
+| `CRITICAL_SUCCESS`, `SUCCESS` | `NONE` |
+| `PARTIAL_SUCCESS` | `GLANCING` |
+| `FAILURE` | `SOLID` |
+
+Damage and trauma then use:
+- the incoming attack's base damage, weapon trauma, effectiveness, attack form and anatomy interaction;
+- the player's existing injury at the targeted part, or 0 when no part is targeted;
+- player protection 0 and trauma protection 0.
+
+Differences between defense methods, and defensive mitigation, are deferred.
+
+An intent defends a given incoming attack at most once. A second defense after one has resolved is mechanics-unavailable; a cancelled or unavailable defense does not use the attack up. An incoming attack with no defending step is not resolved here, because the turn loop is deferred.
+
+### Baselines
+
+These are explicit placeholders, not designed values. Each check or calculation records them:
+- **Suitability**: `FAIR` (0 DC) for every rolled check. No other DC adjustment is produced yet.
+- **Attack-form modifier** for player attacks: 0.
+- **Player protection and trauma protection**: 0 (see Protection).
+- **Defensive mitigation** for the player: 0.
+
+A player attack's DC, effectiveness, protection, trauma protection, existing injury, anatomy interaction and defensive mitigation all come from a backend-supplied combat profile for the exact target: the creature as a whole, or the named body part.
+- A named part never falls back to another part or to the whole creature. Without a profile for the exact target, the attack is mechanics-unavailable.
+- When no part is named, none is invented.
+- Naming a part adds no targeting adjustment yet.
+
+### Movement
+
+- A zone joined to the player's current zone by a connection the player knows of (not hidden): automatic success, and the player moves.
+- The current zone: automatic success, with no movement.
+- Any other zone, including one joined only by an undiscovered passage: automatic failure, with no movement and nothing revealed.
+
+Movement in an earlier step changes the zone that later steps start from.
+
+### Multi-step intents
+
+Steps resolve in order:
+1. Once the player is down, every later step is **cancelled** (`PLAYER_DOWN`). A player already at 0 HP resolves nothing and draws no rolls.
+2. A `WHILE` step is mechanics-unavailable, because simultaneous actions are not designed yet.
+3. An `IF_PREVIOUS_SUCCEEDS` step runs only when the previous step resolved as a success: a critical success, a success or an automatic success. After a partial success, a failure, a cancelled step or an unavailable step, it is cancelled (`PREVIOUS_STEP_NOT_SUCCESSFUL`).
+4. `START` and `THEN` steps always run.
+
+The player is down once the damage from failed defenses in this intent reaches their current HP. Resolution reports this; it does not change HP itself.
+
+### Overall result
+
+1. If any step was cancelled because the player is down, the result is `INTERRUPTED`.
+2. Otherwise, if no step resolved, it is `MECHANICS_UNAVAILABLE`.
+3. Otherwise, if every step resolved as a success, it is `COMPLETE_SUCCESS`.
+4. Otherwise, if every step that resolved is a failure, it is `FAILURE`.
+5. Otherwise it is `PARTIAL_SUCCESS`.
+
+### Randomness
+
+Only checks draw randomness: one d20 per rolled step, in step order, from the generator the caller supplies. Automatic, cancelled and unavailable steps draw nothing, so the same intent, state and seed always resolve the same way.

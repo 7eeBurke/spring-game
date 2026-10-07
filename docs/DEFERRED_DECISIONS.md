@@ -10,18 +10,22 @@ If a stage requires one of these, flag it and get a decision before implementing
 
 - Combat turn loop: ordering of player and enemy actions.
 - Multi-enemy combat details.
-- Enemy attack resolution: how the player's defensive response is checked against an incoming attack.
-- How a defense result maps to `ContactQuality` and `defensiveMitigation`.
+- Resolving an incoming attack the player does not defend against, and when the enemy's attack happens relative to the player's other steps.
+- Defensive mitigation, and mechanical differences between defense methods (evade type, parry contact, the cover object for `TAKE_COVER`) beyond the stat each uses. The defense stat, DC and the defense-to-`ContactQuality` mapping are in `GAME_RULES.md` "Action Resolution".
 - Mapping from canonical attack methods to universal attack templates.
-- Attack-property shift/override values.
-- Effectiveness determination (weapon/damage type vs target). The levels and their multipliers are defined in `GAME_RULES.md`; only how a level is chosen is deferred.
-- Attack-form modifier values for trauma (for example deep-cut, penetrating, crushing forms) and how a form is derived.
+- Attack geometry: attack-property shift/override values (height, width, speed, force, reach, commitment) and how they affect defenses.
+- Effectiveness determination (weapon/damage type vs target). The levels and their multipliers are defined in `GAME_RULES.md`; only how a level is chosen is deferred. Resolution currently takes it from the backend-supplied target profile or incoming attack.
+- Attack-form modifier values for trauma (for example deep-cut, penetrating, crushing forms) and how a form is derived. Player attacks currently use the baseline 0.
 - Anatomy interaction modifier values for trauma.
-- Exact `WHILE` resolution semantics (beyond: genuinely simultaneous, subject to simultaneous-action complexity), and how `THEN` and `IF_PREVIOUS_SUCCEEDS` treat each degree of success, interruption and cancellation.
-- Detailed social (`COMMUNICATE`) resolution rules.
-- Suitability determination and stat selection for an action in context.
-- Movement resolution: zone reachability, range-band changes and movement costs (and the `ZONE_NOT_REACHABLE` validation code).
-- Combat timing and response-to-attack execution, including what a `DEFEND` step means with no incoming attack.
+- `WHILE` resolution semantics (beyond: genuinely simultaneous, subject to simultaneous-action complexity). A `WHILE` step is currently mechanics-unavailable.
+- Detailed social (`COMMUNICATE`) resolution rules: when speech needs a check, which stat, and its consequences. Communication currently resolves as an automatic success with no consequence.
+- Suitability tables beyond the `FAIR` baseline, and the other DC adjustments (injury, position, environment, passive, targeting, complexity).
+- Stats and DCs for actions that do not resolve yet: interaction, observation, ability use, item use, climbing and other movement.
+- Hit location when an attack names no body part. None is currently invented.
+- Range bands and positioning: `CLOSE_DISTANCE`, `RETREAT`, `CIRCLE`, `DISENGAGE`, proactive cover, range-band changes and movement costs.
+- Exit traversal: the zone the player arrives in, and when a scene change happens.
+- Mechanics for attacks on objects or hazards, and for attack purposes other than `DAMAGE` (disarm, trip, push and others).
+- Applying `ResolvedOutcome` effects to state (HP, body severity, enemy HP, location) and persisting them.
 - Physical-plausibility rules: which actions are provably impossible (the validation seam exists; the baseline proves nothing impossible).
 - Unarmed attacks (punches, kicks): method, template, damage and trauma. They are not part of the current action vocabulary.
 
@@ -29,7 +33,7 @@ If a stage requires one of these, flag it and get a decision before implementing
 
 - Condition behaviour (`BLEEDING`, `FRACTURED`, `BURNED`, `POISONED`).
 - Body-part severity escalation thresholds.
-- Existing-injury trauma modifier for a `DESTROYED` part (the `GAME_RULES.md` table covers healthy to crippled only).
+- Existing-injury trauma modifier for a `DESTROYED` part (the `GAME_RULES.md` table covers healthy to crippled only). Defending against an attack aimed at a destroyed part is currently mechanics-unavailable.
 - Healing and recovery-item effects.
 
 ## Enemies
@@ -78,6 +82,7 @@ If a stage requires one of these, flag it and get a decision before implementing
 ## Presentation and Contracts
 
 - Run summary contents.
+- Narration facts: the reduced, narration-safe facts derived from a `ResolvedOutcome` for the narrator.
 - Entity/object ID format exposed to AI roles.
 - How opaque player-owned action references (weapons, abilities, items) are minted and presented to the Action Interpreter; the validation contract accepts any non-blank opaque references.
 - AI provider integration and structured-output schema/JSON codec for `ActionIntent`, including interpreter-side `ACTION_NOT_SUPPORTED` / `INTERPRETATION_FAILED` handling.

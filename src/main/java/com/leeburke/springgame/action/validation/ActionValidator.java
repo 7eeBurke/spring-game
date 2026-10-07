@@ -52,6 +52,16 @@ public final class ActionValidator {
 		this.plausibility = Objects.requireNonNull(plausibility, "plausibility");
 	}
 
+	/**
+	 * The intent wrapped as proof of validation, or empty if {@link #validate} reports any error.
+	 * Action resolution accepts only this type.
+	 */
+	public Optional<ValidatedActionIntent> validated(ActionIntent intent, ActionValidationContext context) {
+		return validate(intent, context).valid()
+				? Optional.of(new ValidatedActionIntent(intent, context))
+				: Optional.empty();
+	}
+
 	public ActionValidationResult validate(ActionIntent intent, ActionValidationContext context) {
 		Objects.requireNonNull(intent, "intent");
 		Objects.requireNonNull(context, "context");

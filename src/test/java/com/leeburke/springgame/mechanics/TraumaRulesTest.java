@@ -39,4 +39,15 @@ class TraumaRulesTest {
 	void rejectsNegativeEffectiveScore() {
 		assertThatIllegalArgumentException().isThrownBy(() -> TraumaRules.severityFor(-1));
 	}
+
+	@ParameterizedTest
+	@CsvSource({ "HEALTHY,0", "INJURED,1", "WOUNDED,2", "CRIPPLED,3" })
+	void existingInjuryModifiersMatchDocumentedTable(BodySeverity severity, int expected) {
+		assertThat(TraumaRules.existingInjuryModifier(severity)).hasValue(expected);
+	}
+
+	@Test
+	void destroyedBodyPartHasNoDefinedExistingInjuryModifier() {
+		assertThat(TraumaRules.existingInjuryModifier(BodySeverity.DESTROYED)).isEmpty();
+	}
 }

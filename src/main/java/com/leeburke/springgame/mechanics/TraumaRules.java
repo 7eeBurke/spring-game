@@ -1,5 +1,7 @@
 package com.leeburke.springgame.mechanics;
 
+import java.util.OptionalInt;
+
 /**
  * V1 trauma tables. See docs/GAME_RULES.md "Trauma".
  */
@@ -24,6 +26,20 @@ public final class TraumaRules {
 			case SOLID -> 0;
 			case CLEAN -> 2;
 			case NONE -> throw new IllegalArgumentException("No contact occurred, so there is no trauma contact modifier");
+		};
+	}
+
+	/**
+	 * Existing-injury trauma modifier for the struck body part's current severity: healthy 0,
+	 * injured +1, wounded +2, crippled +3. Empty for DESTROYED, whose value is not yet defined.
+	 */
+	public static OptionalInt existingInjuryModifier(BodySeverity severity) {
+		return switch (severity) {
+			case HEALTHY -> OptionalInt.of(0);
+			case INJURED -> OptionalInt.of(1);
+			case WOUNDED -> OptionalInt.of(2);
+			case CRIPPLED -> OptionalInt.of(3);
+			case DESTROYED -> OptionalInt.empty();
 		};
 	}
 

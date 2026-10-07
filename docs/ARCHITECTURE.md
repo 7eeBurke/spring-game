@@ -41,7 +41,7 @@ Steps are ordered and may relate to the previous step using:
 - `IF_PREVIOUS_SUCCEEDS`
 - `WHILE`
 
-`WHILE` represents genuinely simultaneous actions and is subject to the simultaneous-action complexity rules (see `GAME_RULES.md`). Exact `WHILE` resolution semantics are deferred to the action-resolution stage (see `DEFERRED_DECISIONS.md`).
+`WHILE` represents genuinely simultaneous actions and is subject to the simultaneous-action complexity rules (see `GAME_RULES.md`). `WHILE` resolution is deferred; such a step is currently mechanics-unavailable. `THEN` and `IF_PREVIOUS_SUCCEEDS` semantics are in `GAME_RULES.md` "Multi-step intents".
 
 The AI may normalize language but may not output rolls, DCs, damage, trauma, success, injuries or new world facts.
 
@@ -50,7 +50,9 @@ The AI may normalize language but may not output rolls, DCs, damage, trauma, suc
 ```
 player text → (future) Action Interpreter → ActionIntent
             → ActionValidator (PlayerSceneView + owned references + known incoming attacks)
-            → (Stage 11) action resolution → ResolvedOutcome → persistence → narration
+            → ValidatedActionIntent
+            → ActionEngine (ActionResolutionContext + caller's RandomGenerator) → ResolvedOutcome
+            → (later) effect application → persistence → narration
 ```
 
 - `action` holds the contract: `ActionIntent`, steps, the sealed payloads and targets, and the vocabulary enums. The action type is derived from the payload.
@@ -59,39 +61,64 @@ player text → (future) Action Interpreter → ActionIntent
 - Owned weapons, abilities and items are referenced by opaque per-context references, not definition codes or persistent instance IDs.
 - Validation never chooses stats, DCs or suitability, never rolls, and never mutates the intent. Both packages are pure Java.
 
+### Resolution Boundary
+
+- `ActionValidator.validated(intent, context)` returns a `ValidatedActionIntent` only when validation finds no errors. Its constructor is package-private to `action.validation`, so an unvalidated intent cannot reach the engine. `validate(...)` is unchanged.
+- `action.resolution` holds `ActionEngine`, its package-private per-action resolvers, the backend-only `ActionResolutionContext` and the outcome model. It is pure Java: no Spring, persistence, JPA or AI, and no randomness except the `RandomGenerator` the caller passes in.
+- `ActionResolutionContext` is authoritative and backend-only, and is never given to the interpreter or narrator. It holds `PlayerCharacterState`, `SceneState`, `PlayerLocation`, the same `PlayerActionReferences` used for validation, combat profiles keyed by `TargetProfileKey(entityId, Optional<BodyPart>)`, and backend-built `IncomingAttack`s keyed by their opaque reference. The enemy model will produce profiles and incoming attacks later; resolution only consumes them.
+- Before drawing any randomness, the engine checks that the two contexts agree:
+  - the same player references and incoming-attack references;
+  - the validated view's current zone equals `PlayerLocation`;
+  - every scene reference the intent actually uses exists in `SceneState` with the same kind and local ID, is not hidden, and has the same player-safe fields as the view.
+
+  A mismatch is an orchestration error (`IllegalArgumentException`), never a gameplay result. No backend identity is added to `ActionIntent`.
+- The engine mutates nothing. It reports typed effects; applying them to state and persisting them comes later.
+- The engine reuses `CheckResolver`, `DamageCalculator` and `TraumaCalculator` and never repeats their arithmetic. Contact mappings live in `mechanics.ContactRules`, and the per-action stats and baselines in `ResolutionRules`.
+
 ## ResolvedOutcome
 
-Top-level conceptual fields:
-- `schemaVersion`
-- `actionIntentId`
-- optional `responseToAttackId`
-- `overallResult`
-- `stepOutcomes[]`
-- `stateChanges[]`
-- `resourceChanges[]`
-- `newEvents[]`
-- `narrationFacts[]`
-- resolution/debug metadata
+Confirmed backend truth, produced only by Java (see `GAME_RULES.md` "Action Resolution" for the rules).
 
-Per-step resolution may include:
-- `CheckResult`
-- attack/defense/movement-specific result payloads
-- generated mechanical effects
-- cancellation reason for later dependent steps
+`ResolvedOutcome` (schema version 1):
+- `schemaVersion`
+- optional `responseToAttack`: the opaque incoming-attack reference the intent responded to
+- `overall`: an `OverallResult`
+- `steps`: one `StepOutcome` per intent step, in order
+- `metadata`: `ResolutionMetadata(rollsConsumed, rulesVersion)`, with no timestamps or IDs
+- `effects()`: every step's effects, flattened in step order
+
+`StepOutcome`:
+- `stepId` and `actionType`
+- `status`: `RESOLVED`, `CANCELLED` or `MECHANICS_UNAVAILABLE`
+- for `RESOLVED`: a `StepSuccess` (`SUCCESS`, `PARTIAL` or `FAILURE`), a `CheckResult` only for rolled steps (an automatic step never fakes a d20), a typed `StepResult` and its effects
+- for `CANCELLED`: only a `CancellationReason` (`PREVIOUS_STEP_NOT_SUCCESSFUL`, `PLAYER_DOWN`)
+- for `MECHANICS_UNAVAILABLE`: only an `UnavailableReason` (`ACTION_NOT_IMPLEMENTED`, `SIMULTANEOUS_ACTION`, `MISSING_TARGET_PROFILE`, `NO_INCOMING_ATTACK`, `INCOMING_ATTACK_ALREADY_RESOLVED`, `UNDEFINED_INJURY_MODIFIER`)
+
+The sealed `StepResult` types are:
+
+| Result | Contents |
+|---|---|
+| `AttackResult` | weapon reference and code, target entity, optional named body part, contact, the Stage 4 `DamageResult` and `TraumaResult` |
+| `DefenseResult` | incoming-attack reference, defense method, incoming contact, `DamageResult`, `TraumaResult` |
+| `MovementResult` | from-zone, to-zone, whether the player moved |
+| `CommunicationResult` | communication kind and optional addressee. The spoken content is not carried. |
+
+The sealed `OutcomeEffect` types are:
+- `TargetDamaged(entityId, hpDamage, bodyPart, impactSeverity)`, produced on any contact, even when the HP damage is 0;
+- `PlayerDamaged(hpDamage, bodyPart, impactSeverity)`;
+- `PlayerMoved(fromZone, toZone)`.
 
 Possible overall results:
 - `COMPLETE_SUCCESS`
 - `PARTIAL_SUCCESS`
 - `FAILURE`
-- `INTERRUPTED`
-- `INVALID`
+- `INTERRUPTED`: resolution began, but the player went down and the remaining steps were cancelled
+- `MECHANICS_UNAVAILABLE`: a valid intent, but no step had designed mechanics
 
-`INTERRUPTED` means action resolution began, but a resulting state or event prevented the remaining sequence from continuing.
-
-Possible step status values:
-- `RESOLVED`
-- `CANCELLED`
-- `INVALID`
+There is no `INVALID` result: invalid intents never reach resolution. These are not part of the outcome yet:
+- prose;
+- narration facts, which will be derived from the typed step outcomes;
+- resource changes and new events, since nothing produces them yet.
 
 ## Narration Boundary
 
@@ -107,8 +134,9 @@ Feature-oriented packages under the base package `com.leeburke.springgame`, grow
   - `content.world` — authored world-generation content (world elements, scene archetypes, regions, fixed scenes) and its catalogue/loader
 - `character` — character generation and character state
 - `mechanics` — checks, DCs, suitability, damage, trauma
-- `action` — the `ActionIntent` contract (steps, payloads, targets, vocabulary); step resolution and `ResolvedOutcome` later
-  - `action.validation` — deterministic validation of an intent against the player-safe view and owned references
+- `action` — the `ActionIntent` contract (steps, payloads, targets, vocabulary)
+  - `action.validation` — deterministic validation of an intent against the player-safe view and owned references, and `ValidatedActionIntent`
+  - `action.resolution` — the pure deterministic `ActionEngine` turning a validated intent into a `ResolvedOutcome` (no Spring, persistence or AI)
 - `combat`
 - `enemy`
 - `world` — region and scene instances, `SceneState` and its integrity rules, `PlayerLocation` (pure Java; region generation will live alongside later)

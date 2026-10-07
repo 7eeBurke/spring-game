@@ -151,6 +151,18 @@ Error codes:
 
 Earlier draft codes map as follows: `UNKNOWN_ENTITY_REFERENCE` and `TARGET_NOT_VISIBLE` are `UNKNOWN_SCENE_REFERENCE` (a separate "not visible" code would leak hidden state); `UNKNOWN_ITEM_REFERENCE`, `ITEM_NOT_OWNED` and `ABILITY_NOT_KNOWN` are `UNKNOWN_PLAYER_REFERENCE`; `AMBIGUOUS_REFERENCE` is `UNRESOLVED_REFERENCE`. `ABILITY_NO_USES`, `BODY_PART_NOT_PRESENT` and `ZONE_NOT_REACHABLE` need mechanics that do not exist yet. `ACTION_NOT_SUPPORTED` and `INTERPRETATION_FAILED` are interpreter-side outcomes handled with AI integration.
 
+### From ActionIntent to ResolvedOutcome
+
+`ActionIntent` → Java validation → Java resolution → `ResolvedOutcome`.
+
+Only an intent that passes validation is resolved. Resolution is entirely Java and is described in `GAME_RULES.md` "Action Resolution". It chooses the stat, DC and baseline suitability, rolls, and computes contact, damage, trauma and movement. Nothing in the intent can supply or influence any of these.
+
+`ResolvedOutcome` is confirmed backend truth and is never AI output. Its vocabulary:
+- overall result: `COMPLETE_SUCCESS`, `PARTIAL_SUCCESS`, `FAILURE`, `INTERRUPTED`, `MECHANICS_UNAVAILABLE`;
+- step status: `RESOLVED`, `CANCELLED`, `MECHANICS_UNAVAILABLE`.
+
+`MECHANICS_UNAVAILABLE` means a valid action whose mechanics are not designed yet. It is not a failure: nothing happened mechanically, so nothing may be narrated as happening. Spoken content from `COMMUNICATE` is not echoed into the outcome. A successful communication only confirms the words were said; it never confirms that anyone reacted.
+
 ## 2. Outcome Narrator
 
 Purpose: convert confirmed `ResolvedOutcome` facts into atmospheric prose.
