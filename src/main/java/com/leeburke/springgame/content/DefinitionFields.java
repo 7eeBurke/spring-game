@@ -1,22 +1,15 @@
 package com.leeburke.springgame.content;
 
-import java.util.regex.Pattern;
+import com.leeburke.springgame.shared.DefinitionCodes;
 
 /** Shared validation for the code and display name every static definition carries. */
 final class DefinitionFields {
-
-	/** Upper snake case, for example {@code WAR_HAMMER}. */
-	static final Pattern CODE_FORMAT = Pattern.compile("[A-Z][A-Z0-9_]*");
 
 	private DefinitionFields() {
 	}
 
 	static String requireCode(String code) {
-		if (code == null || !CODE_FORMAT.matcher(code).matches()) {
-			throw new IllegalArgumentException(
-					"Definition code must be upper snake case (" + CODE_FORMAT.pattern() + "), but was: " + quoted(code));
-		}
-		return code;
+		return DefinitionCodes.requireCode(code, "Definition code");
 	}
 
 	static String requireDisplayName(String displayName) {

@@ -5,15 +5,11 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.Objects;
 
+import com.leeburke.springgame.shared.StrictJson;
+
 import tools.jackson.core.JacksonException;
-import tools.jackson.core.StreamReadFeature;
-import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JavaType;
-import tools.jackson.databind.MapperFeature;
-import tools.jackson.databind.cfg.CoercionAction;
-import tools.jackson.databind.cfg.CoercionInputShape;
 import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.type.LogicalType;
 
 /**
  * Loads the static content JSON files from a classpath directory into a {@link GameContentCatalog}.
@@ -33,22 +29,8 @@ public final class GameContentLoader {
 	static final String ITEMS_FILE = "items.json";
 	static final String NAMES_FILE = "character-names.json";
 
-	private static final JsonMapper MAPPER = JsonMapper.builder()
-			.enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-			.enable(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES)
-			.enable(DeserializationFeature.FAIL_ON_NULL_CREATOR_PROPERTIES)
-			.enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
-			.enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-			.disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
-			.disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
-			.disable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
-			.enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
-			// Text values (such as character names) must be JSON strings, not numbers or booleans.
-			.withCoercionConfig(LogicalType.Textual, config -> config
-					.setCoercion(CoercionInputShape.Integer, CoercionAction.Fail)
-					.setCoercion(CoercionInputShape.Float, CoercionAction.Fail)
-					.setCoercion(CoercionInputShape.Boolean, CoercionAction.Fail))
-			.build();
+	/** This loader's own strict mapper (see {@link StrictJson}). */
+	private static final JsonMapper MAPPER = StrictJson.createMapper();
 
 	private final String resourceDirectory;
 

@@ -86,23 +86,28 @@ It may dramatize confirmed facts but may not add consequences or interactable ob
 
 Feature-oriented packages under the base package `com.leeburke.springgame`, growing toward:
 - `config` — Spring configuration
-- `shared` — small cross-feature value types/utilities
+- `shared` — small cross-feature utilities (`DefinitionCodes` code format, `StrictJson` mapper factory); no Spring or JPA
 - `content` — static authored definitions (weapons, passives, abilities, items) loaded from classpath JSON into an immutable catalogue (see `CONTENT.md`)
 - `character` — character generation and character state
 - `mechanics` — checks, DCs, suitability, damage, trauma
 - `action` — `ActionIntent`, validation, step resolution, `ResolvedOutcome`
 - `combat`
 - `enemy`
-- `world` — region/scene generation, `SceneState`, `PlayerSceneView`
+- `world` — region and scene instances, `SceneState` and its integrity rules, `PlayerLocation` (pure Java; region generation will live alongside later)
+  - `world.view` — `PlayerSceneView` and its projector: the player-safe boundary
 - `run` — run lifecycle and the `GameRun` read model
-- `persistence` — JPA entities, entity/domain mapping and the run persistence facade (`GameRunStore`)
+- `persistence` — JPA entities, entity/domain mapping, the scene-state JSON codec and the persistence facades (`GameRunStore`, `WorldStore`)
 - `ai` — AI role adapters and deterministic fallbacks
 - `api` — HTTP controllers and request/response DTOs
 
 Packages are created only when a stage needs them.
 Domain game logic stays independent of Spring wherever practical (plain Java classes, constructor-injected, unit-testable without a Spring context); Spring wiring lives at the edges (`config`, `api`, `persistence`).
 
-Dependency direction: `persistence` depends on `run`, `character`, `content` and `mechanics`, never the reverse. Domain and content types carry no JPA or Spring annotations; JPA entities stay inside `persistence` and are never returned to callers.
+Dependency direction: `persistence` depends on `world`, `run`, `character`, `content` and `mechanics`, never the reverse. Domain and content types carry no JPA, Spring or Jackson annotations; JPA entities stay inside `persistence` and are never returned to callers.
+
+### Player-Safe Scene View
+
+Action interpretation and AI roles receive `PlayerSceneView`, never authoritative `SceneState`. The view uses its own records (never the authoritative ones), so a field added to authoritative state cannot leak automatically. It never contains hidden content, content inside hidden or non-visible zones, exit destinations or any UUID, seeds, revisions, environment flags or active events. The caller decides which zones are visible; the projector owns the safe filtering (see `WORLD_GENERATION.md`).
 
 ## Technology Stack
 
@@ -113,7 +118,7 @@ Dependency direction: `persistence` depends on `run`, `character`, `content` and
 - Flyway for schema migrations
 - Hibernate schema validation (`ddl-auto=validate`), not automatic schema creation
 - Testcontainers PostgreSQL for database integration tests
-- Jackson 3 (`tools.jackson`, version managed by the Spring Boot parent) for static content JSON
+- Jackson 3 (`tools.jackson`, version managed by the Spring Boot parent) for static content JSON and persisted scene-state documents
 - React + TypeScript + Vite for the frontend (later stage)
 - Lombok is optional
 
@@ -122,10 +127,24 @@ The AI provider is deliberately unspecified until the AI integration stage. Do n
 ## Persistence Strategy
 
 - Important lifecycle/domain relationships (run, character, region instance, scene instance, etc.) remain relational.
-- `SceneInstance` has relational identity/metadata plus a `revision`.
-- `SceneInstance` always belongs to a run. A region scene also belongs to a `RegionInstance`; the hub scene (`THE_LAST_LANTERN`) has no region association. Each scene instance is identified as a hub or region scene.
+- `SceneInstance` always belongs to a run. A `REGION` scene also belongs to a `RegionInstance` and has a scene seed; a `HUB` scene (`THE_LAST_LANTERN`) has neither.
+- `SceneInstance` metadata (identity, run, kind, region, definition code, seed, discovered flag, revision) is relational. Only the dynamic nested `SceneState` is stored as PostgreSQL JSONB, and metadata is never duplicated inside it.
 - A generated region is built and validated fully in memory, then persisted in a single transaction; invalid regions are never persisted.
-- Dynamic nested `SceneState` content may be persisted as PostgreSQL JSONB.
+
+### Scene-State Documents
+
+- `scene_instance.state` is JSONB written and read only by `SceneStateCodec`, through explicit document records (not by serializing domain records). Hibernate binds the text as JSON without interpreting it.
+- `scene_instance.state_schema_version` identifies the document structure (currently 1). It is not content or rules versioning. An unsupported version fails clearly; migration between document versions is deferred.
+- Decoding is strict: malformed JSON, unknown, missing or null fields, invalid enum values and documents violating `SceneState` invariants all fail as persisted-state corruption naming the scene. A corrupt document never becomes a default scene.
+
+### Scene Revisions
+
+- `scene_instance.revision` is the JPA `@Version` column, used only for mutable scene state. A new scene starts at 0; every state update increments it.
+- `WorldStore.updateSceneState(sceneId, expectedRevision, newState)` writes only if the scene is still at `expectedRevision`. A stale revision, or a concurrent update that commits first, raises `StaleSceneStateException` and writes nothing. Two resolutions based on the same revision can never both commit.
+
+### Same-Run Integrity
+
+Composite foreign keys on `(id, run_id)` ensure a scene can only reference a region of its own run, and the run's location can only reference a scene of its own run. The location's zone is validated by the application (zones live inside the JSONB state): it must exist and must not be hidden. Exit destinations inside scene state have no database foreign key; complete-region validation checks them before persistence.
 - Static game definitions (weapons, items, passives, abilities, enemies, scene archetypes, events) do not automatically become database tables. Weapons, passives, abilities and items are authored in `src/main/resources/content/*.json` (see `CONTENT.md`); run state refers to them by definition code.
 
 ### Schema Ownership
@@ -143,10 +162,16 @@ The AI provider is deliberately unspecified until the AI integration stage. Do n
 - `player_body_part` — one row per body part and its severity.
 - `player_tool_belt_entry` — one row per occupied belt slot: slot index (list position), entry kind (`WEAPON`/`ITEM`) and definition code. No runtime instance IDs.
 
+### Current Tables (V2)
+
+- `region_instance` — region identity, run and definition code.
+- `scene_instance` — scene metadata, `revision`, `state_schema_version` and the JSONB `state`; a check constraint enforces the hub/region shape.
+- `run_world_state` — keyed by `run_id`: the current scene and zone. A run without a world yet has no row.
+
 ### Static Content References
 
 - Saving stores definition codes only, and only for definitions identical to the current catalogue's definition for that code.
 - Loading resolves codes through the current `GameContentCatalog`. An unknown code, a run without its player character, or any stored value that fails domain validation raises a clear error; a partial state is never returned.
 - Loading across changed static-content versions is not guaranteed (see `CONTENT.md` and `DEFERRED_DECISIONS.md`).
 
-Player and run state is relational. JSONB is reserved for the later dynamic `SceneState`, not used for simple fixed state.
+Player and run state is relational. JSONB is used only for the dynamic `SceneState`, not for simple fixed state.

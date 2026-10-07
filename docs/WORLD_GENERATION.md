@@ -27,9 +27,7 @@ Run instances say what exists now.
 - The player must be able to leave almost immediately.
 - It must not become a repetitive tutorial sequence.
 
-Persistence: the hub uses the same persistent `SceneInstance` concept as other scenes, but belongs directly to the run rather than to a `RegionInstance`. The future persistence model therefore:
-- permits a scene instance to have no region association;
-- identifies each scene instance as a hub scene or a region scene.
+Persistence: the hub uses the same persistent `SceneInstance` concept as other scenes, with kind `HUB` and definition code `THE_LAST_LANTERN`. A `HUB` scene belongs directly to the run: it has no `RegionInstance` and no procedural scene seed (see World and Scene State Model).
 
 ## Hollow Chapel MVP Graph
 
@@ -107,41 +105,70 @@ Use content budgets/constraints so procedural generation is controlled rather th
 Do not force the pattern "enemy + interactable + reward" into every scene.
 Some scenes may be quiet, event-driven, resource-rich, dangerous, or almost empty.
 
-## SceneState
+## World and Scene State Model
 
-Authoritative conceptual fields:
-- `sceneInstanceId`
-- `regionInstanceId` (absent for the hub scene, which belongs directly to the run)
-- `archetypeCode`
-- `sceneSeed`
-- `sceneTags[]`
-- `zones[]`
-- `zoneConnections[]`
-- `entities[]`
-- `objects[]`
-- `hazards[]`
-- `exits[]`
-- `activeEvents[]`
-- `environmentStates[]`
-- `hiddenContent[]`
-- `discoveredFacts[]`
-- `sceneHistory[]`
-- `revision`
+The world/scene state model (instances, state, the player-safe view and their persistence) is separate from region generation. Generation produces instances of this model; the model itself contains no generation logic.
 
-## PlayerSceneView
+### RegionInstance
 
-Filtered view containing only what the player currently knows/sees:
+A generated region belonging to a run: `id`, `runId`, `definitionCode` (for example `HOLLOW_CHAPEL`). Generation metadata (route graph, roles, generation context) belongs to region generation.
+
+### SceneInstance (relational metadata)
+
+- `id`, `runId`
+- `definitionCode` (for example `THE_LAST_LANTERN`, `RUINED_NAVE`)
+- placement:
+  - `HUB` — belongs directly to the run; no region, no procedural seed;
+  - `REGION` — belongs to a `RegionInstance` and carries its `sceneSeed`;
+- `discovered`
+- `revision` — starts at 0 and increases by one on every state update (optimistic concurrency, see `ARCHITECTURE.md`)
+- `state` — the `SceneState`
+
+Invalid hub/region combinations cannot be represented, and no magic IDs or seeds are used.
+
+### SceneState (dynamic contents only)
+
+Scene identity, run, region, kind, definition code, seed, discovered flag and revision are `SceneInstance` metadata and are not duplicated here.
+
+- `zones[]` — meaningful areas (not coordinates or tiles), each with a stable local ID and display name; at least one
+- `connections[]` — undirected movement possibilities between two zones of the scene
+- `entities[]` — placement identity only (local ID, definition code, zone); enemy state comes later
+- `objects[]`, `hazards[]`, `activeEvents[]` — local ID, definition code, zone; mechanics come later
+- `exits[]` — local ID, origin zone, destination scene ID
+- `environmentFlags[]` — scene-wide state flags (codes)
+- `hiddenContent[]` — typed references (kind + local ID) marking content as hidden; content is stored once
+- `discoveredFacts[]` — fact codes the player has genuinely learned
+
+Structural integrity is enforced: unique local IDs per collection, every zone reference resolves, connections join two distinct existing zones with no duplicate pairs, hidden references resolve to real content of their kind, and flags/facts are unique codes.
+
+Scene history is deferred until its entry schema is designed. Per-object state (for example burned or open) and zone tags are deferred until a mechanic needs them.
+
+### PlayerSceneView
+
+The only scene representation given to action interpretation and AI roles. It uses its own records, never the authoritative ones, and contains only:
 - current zone;
-- visible/known zones;
-- visible entities;
-- visible objects;
-- visible hazards;
-- known exits;
-- known environmental facts;
-- player position/range;
-- recent visible changes.
+- visible zones (ID and display name);
+- visible connections between visible zones (no connection IDs);
+- visible entities, objects and hazards (local ID, definition code, zone);
+- known exits (local ID and zone; never the destination);
+- discovered facts.
 
-The AI must not receive hidden content.
+Projection rules, given the set of currently visible zones supplied by the caller:
+- hidden zones are never shown, even if the caller lists them;
+- hidden content is never shown;
+- content inside a zone that is not effectively visible is never shown;
+- a connection is shown only if it is not hidden and both its zones are visible;
+- the current zone must exist, must not be hidden and must be among the visible zones.
+
+Determining which zones are visible (line of sight) is deferred. Active events and environment flags are not exposed until rules define how they become perceivable. Combat range and relative positioning belong to combat.
+
+### Player Location
+
+The run's current location is a scene and a zone within it. It is world state, not character state. The scene must belong to the same run, and the zone must exist in that scene and must not be hidden.
+
+## Region Generation
+
+Region generation builds a complete generated region (graph, roles, archetypes, every scene's contents) as instances of the model above, validates it as a whole, and persists it once. This includes validating that exits reference real scenes and that required routes are coherent; the database cannot validate exit destinations stored inside scene state. See Scene Generation, Hollow Chapel MVP Graph and Seeds and Validation.
 
 ## Persistence
 
@@ -155,6 +182,8 @@ Revisiting or refreshing must not reroll:
 - exits.
 
 World mutations persist: dead enemies remain dead, items remain removed, revealed exits remain revealed, burned objects remain burned.
+
+Dynamic scene state is persisted once and loaded as stored; it is never regenerated or rerolled because a scene is revisited.
 
 ## Progression
 

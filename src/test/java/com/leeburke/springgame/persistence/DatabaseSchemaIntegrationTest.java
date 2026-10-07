@@ -30,10 +30,11 @@ class DatabaseSchemaIntegrationTest {
 				"SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'", String.class);
 	}
 
-	@Test
-	void migrationV1Succeeded() {
+	@ParameterizedTest
+	@ValueSource(strings = { "1", "2" })
+	void migrationSucceeded(String version) {
 		Boolean success = jdbc.queryForObject(
-				"SELECT success FROM flyway_schema_history WHERE version = '1'", Boolean.class);
+				"SELECT success FROM flyway_schema_history WHERE version = ?", Boolean.class, version);
 		assertThat(success).isTrue();
 	}
 
@@ -43,8 +44,23 @@ class DatabaseSchemaIntegrationTest {
 				"flyway_schema_history", "game_run", "player_character", "player_body_part", "player_tool_belt_entry");
 	}
 
+	@Test
+	void stage8TablesExist() {
+		assertThat(publicTables()).contains("region_instance", "scene_instance", "run_world_state");
+	}
+
+	@Test
+	void sceneStateIsPostgresJsonb() {
+		String dataType = jdbc.queryForObject("""
+				SELECT data_type FROM information_schema.columns
+				WHERE table_schema = 'public' AND table_name = 'scene_instance' AND column_name = 'state'
+				""", String.class);
+		assertThat(dataType).isEqualTo("jsonb");
+	}
+
 	@ParameterizedTest
-	@ValueSource(strings = { "weapon", "passive", "abilit", "item", "character_name", "content" })
+	@ValueSource(strings = { "weapon", "passive", "abilit", "item", "character_name", "content",
+			"region_def", "archetype", "object_def", "hazard_def", "event_def" })
 	void noStaticContentDefinitionTables(String contentTypeFragment) {
 		assertThat(publicTables())
 				.filteredOn(table -> !table.equals("player_tool_belt_entry"))

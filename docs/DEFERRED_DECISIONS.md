@@ -54,7 +54,15 @@ If a stage requires one of these, flag it and get a decision before implementing
 - Anti-repeat history window and weighting strength.
 - Cross-version deterministic replay and static-content versioning (reproduction currently assumes the same rules/content version). Persisted runs store definition codes; a run referencing a code that was later removed or renamed fails to load clearly. Migrating stored codes is deferred.
 
+## World and Scenes
+
+- Scene history: the entry schema for recent changes/action history (not yet part of `SceneState`).
+- Visibility / line-of-sight algorithm that produces the set of currently visible zones (the projector only filters safely given that set).
+- How active events and environment flags become player-perceivable in `PlayerSceneView`.
+- Per-object and per-zone state (for example burned, open) and zone tags.
+- Migration of persisted scene-state JSON documents between `state_schema_version`s.
+
 ## Presentation and Contracts
 
 - Run summary contents.
-- Entity/object ID format exposed to AI roles.
+- Entity/object ID format exposed to AI roles. `PlayerSceneView` currently exposes scene-local IDs and never UUIDs (no scene, exit-destination or run identities); the final AI-facing format is still undecided.
