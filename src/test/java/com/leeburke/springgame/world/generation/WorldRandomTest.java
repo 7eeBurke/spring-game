@@ -47,4 +47,21 @@ class WorldRandomTest {
 	void usesTheNamedAlgorithm() {
 		assertThat(WorldRandom.ALGORITHM).isEqualTo("L64X128MixRandom");
 	}
+
+	@Test
+	void stableHashIsSixtyFourBitFnv1aOverUtf8() {
+		// Published FNV-1a 64-bit test vectors.
+		assertThat(WorldRandom.stableHash("")).isEqualTo(0xCBF29CE484222325L);
+		assertThat(WorldRandom.stableHash("a")).isEqualTo(0xAF63DC4C8601EC8CL);
+		assertThat(WorldRandom.stableHash("foobar")).isEqualTo(0x85944171F73967E8L);
+	}
+
+	@Test
+	void entitySeedIsStableAndDistinctPerEntityAndScene() {
+		long seed = WorldRandom.entitySeed(42, "acolyte_1");
+		assertThat(WorldRandom.entitySeed(42, "acolyte_1")).isEqualTo(seed);
+		assertThat(WorldRandom.entitySeed(42, "acolyte_2")).isNotEqualTo(seed);
+		assertThat(WorldRandom.entitySeed(43, "acolyte_1")).isNotEqualTo(seed);
+		assertThat(seed).isNotEqualTo(WorldRandom.sceneSeed(42, 0));
+	}
 }

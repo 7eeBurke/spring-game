@@ -5,6 +5,8 @@ import org.springframework.context.annotation.Configuration;
 
 import com.leeburke.springgame.content.GameContentCatalog;
 import com.leeburke.springgame.content.GameContentLoader;
+import com.leeburke.springgame.content.enemy.EnemyCatalog;
+import com.leeburke.springgame.content.enemy.EnemyContentLoader;
 import com.leeburke.springgame.content.world.WorldContentCatalog;
 import com.leeburke.springgame.content.world.WorldContentLoader;
 
@@ -23,5 +25,10 @@ public class ContentConfiguration {
 	@Bean
 	WorldContentCatalog worldContentCatalog() {
 		return WorldContentLoader.loadBundled();
+	}
+
+	@Bean
+	EnemyCatalog enemyCatalog(GameContentCatalog content, WorldContentCatalog worldContent) {
+		return EnemyContentLoader.loadBundled(content, worldContent);
 	}
 }

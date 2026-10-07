@@ -1,0 +1,28 @@
+[
+  {
+    "code": "HOLLOW_ACOLYTE",
+    "anatomy": "HUMANOID",
+    "weapon": "DAGGER",
+    "statPriority": [
+      "AGILITY",
+      "PERCEPTION",
+      "MIGHT",
+      "RESOLVE",
+      "ARCANA"
+    ],
+    "fixedStats": {},
+    "baseHp": 12,
+    "defenseStat": "AGILITY",
+    "traits": [],
+    "holdWeight": 0,
+    "attacks": [
+      {
+        "code": "TEST_SLASH",
+        "method": "SLASH",
+        "template": "QUICK_SLASH",
+        "weight": 10
+      }
+    ],
+    "speed": 3
+  }
+]

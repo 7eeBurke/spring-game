@@ -269,3 +269,66 @@ Slots are written as `slot: kind [candidates] → zones, chance / hiddenChance`.
 Zones `lantern_hearth` (Lantern Hearth) and `chapel_road` (Chapel Road), connection `hearth_road`; start zone `lantern_hearth`; exit `road_to_chapel` in `chapel_road`, leading to `HOLLOW_CHAPEL`.
 
 Adding archetypes, slots, elements or another region that uses the existing fields is a JSON-only change.
+
+# Enemy Content
+
+Location: `src/main/resources/content/enemy/`, loaded by `EnemyContentLoader` into an immutable `EnemyCatalog` with the same strict JSON rules and its own mapper. The loader needs the weapon and world catalogues to check cross-references. Enemy definitions are static content: there are no database tables for them, and enemy run state refers to them by code (see `ARCHITECTURE.md`).
+
+| File | Definition type |
+|---|---|
+| `anatomies.json` | `AnatomyDefinition` |
+| `enemies.json` | `EnemyDefinition` with its `EnemyAttackOption`s |
+
+## Schemas
+
+### Anatomies
+
+| Field | Rule |
+|---|---|
+| `code` | definition code, unique |
+| `bodyParts` | non-empty list of `BodyPart`, no duplicates |
+
+### Enemies
+
+| Field | Rule |
+|---|---|
+| `code` | definition code, unique; must be a world element of kind `ENTITY` |
+| `anatomy` | an anatomy code |
+| `weapon` | a weapon code from `weapons.json`; damage, trauma, type and name are never repeated here |
+| `statPriority` | all five `StatType`s, highest first; empty for a fixed-stat enemy |
+| `fixedStats` | an object giving all five stats (3–10); empty (`{}`) for a shape-priority enemy |
+| `baseHp` | at least 1, and high enough that max HP stays at least 1 for the lowest possible RESOLVE |
+| `defenseStat` | the `StatType` behind the enemy's defense DC |
+| `traits` | `EnemyTrait`s, no duplicates; `ADAPTIVE` and `RELENTLESS` cannot be combined |
+| `holdWeight` | base behaviour weight of holding, at least 0 |
+| `attacks` | at least one `{code, method: WeaponMethod, template: AttackTemplate, weight >= 1}` |
+
+Exactly one of `statPriority` and `fixedStats` is non-empty. Attack option codes use the definition-code format, are unique across all enemies, and `HOLD` is reserved. A world `ENTITY` code with no enemy definition is allowed (for a future non-combat entity); every bundled `ENTITY` has one.
+
+Loading fails, naming the file or directory, for malformed JSON, missing, null or unknown fields, wrong value types, unknown enum values, bad codes, duplicate codes, unknown anatomy, weapon or world entity, a world element that is not an `ENTITY`, and any rule above.
+
+`EnemyTrait`: `AGGRESSIVE`, `CAUTIOUS`, `OPPORTUNISTIC`, `RECKLESS`, `ADAPTIVE`, `RELENTLESS`. Their behaviour effects are in `GAME_RULES.md` "Enemy behaviour"; `OPPORTUNISTIC` has none yet.
+
+## Bundled Enemy Content
+
+`HUMANOID` anatomy: all ten body parts. All four enemies use it.
+
+| | `HOLLOW_ACOLYTE` | `BONE_WARDEN` | `ASHBOUND_PENITENT` | `CHAPEL_GUARDIAN` |
+|---|---|---|---|---|
+| Weapon | `DAGGER` | `WAR_HAMMER` | `EMBER_ROD` | `LONGSWORD` |
+| Stats | priority AGI > PER > MIG > RES > ARC | priority MIG > RES > PER > AGI > ARC | priority ARC > RES > PER > AGI > MIG | fixed MIG 10, AGI 9, RES 8, PER 5, ARC 4 |
+| Base HP | 12 | 20 | 14 | 40 |
+| Defense stat | `AGILITY` | `MIGHT` | `AGILITY` | `MIGHT` |
+| Traits | `AGGRESSIVE`, `OPPORTUNISTIC` | `RELENTLESS` | `CAUTIOUS`, `ADAPTIVE` | `AGGRESSIVE`, `RELENTLESS` |
+| Hold weight | 0 | 0 | 10 | 0 |
+
+Attack options (method / template / weight):
+
+| Enemy | Options |
+|---|---|
+| `HOLLOW_ACOLYTE` | `ACOLYTE_QUICK_SLASH` SLASH / QUICK_SLASH / 55; `ACOLYTE_STAB` THRUST / THRUST / 45 |
+| `BONE_WARDEN` | `WARDEN_OVERHEAD_SMASH` SMASH / OVERHEAD_STRIKE / 45; `WARDEN_HEAVY_SMASH` SMASH / HEAVY_SMASH / 35; `WARDEN_HAFT_HOOK` HOOK / HOOK_AND_PULL / 20 |
+| `ASHBOUND_PENITENT` | `PENITENT_EMBER_BOLT` PROJECT / PROJECTED_ATTACK / 70; `PENITENT_ROD_STRIKE` SMASH / OVERHEAD_STRIKE / 20 |
+| `CHAPEL_GUARDIAN` | `GUARDIAN_SWEEPING_CUT` SLASH / HORIZONTAL_SWING / 40; `GUARDIAN_OVERHEAD_CLEAVE` SLASH / OVERHEAD_STRIKE / 35; `GUARDIAN_LUNGE` THRUST / THRUST / 25 |
+
+Adding an enemy for an existing world entity, or new attack options, is a JSON-only change.

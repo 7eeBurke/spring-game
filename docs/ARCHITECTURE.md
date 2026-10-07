@@ -65,7 +65,7 @@ player text → (future) Action Interpreter → ActionIntent
 
 - `ActionValidator.validated(intent, context)` returns a `ValidatedActionIntent` only when validation finds no errors. Its constructor is package-private to `action.validation`, so an unvalidated intent cannot reach the engine. `validate(...)` is unchanged.
 - `action.resolution` holds `ActionEngine`, its package-private per-action resolvers, the backend-only `ActionResolutionContext` and the outcome model. It is pure Java: no Spring, persistence, JPA or AI, and no randomness except the `RandomGenerator` the caller passes in.
-- `ActionResolutionContext` is authoritative and backend-only, and is never given to the interpreter or narrator. It holds `PlayerCharacterState`, `SceneState`, `PlayerLocation`, the same `PlayerActionReferences` used for validation, combat profiles keyed by `TargetProfileKey(entityId, Optional<BodyPart>)`, and backend-built `IncomingAttack`s keyed by their opaque reference. The enemy model will produce profiles and incoming attacks later; resolution only consumes them.
+- `ActionResolutionContext` is authoritative and backend-only, and is never given to the interpreter or narrator. It holds `PlayerCharacterState`, `SceneState`, `PlayerLocation`, the same `PlayerActionReferences` used for validation, combat profiles keyed by `TargetProfileKey(entityId, Optional<BodyPart>)`, and backend-built `IncomingAttack`s keyed by their opaque reference. The `enemy` package produces enemy profiles and incoming attacks (see Enemies); resolution only consumes them.
 - Before drawing any randomness, the engine checks that the two contexts agree:
   - the same player references and incoming-attack references;
   - the validated view's current zone equals `PlayerLocation`;
@@ -120,6 +120,52 @@ There is no `INVALID` result: invalid intents never reach resolution. These are 
 - narration facts, which will be derived from the typed step outcomes;
 - resource changes and new events, since nothing produces them yet.
 
+## Enemies
+
+### Packages and Types
+
+- `content.enemy`: static enemy content (`AnatomyDefinition`, `EnemyDefinition`, `EnemyAttackOption`, `EnemyStatRule`, `EnemyTrait`, `EnemyCatalog`, `EnemyContentLoader`).
+- `enemy`: run state and the builders that feed Stage 11.
+  - `EnemyInstance` and `EnemyBody` hold the state.
+  - `EnemyGenerator`, `EnemyRosterGenerator`, `GeneratedEnemyRoster`, `SceneEnemy` and `EnemyRosterValidator` handle generation.
+  - `EnemyCombatant` is the checked combination of instance, definition, anatomy and weapon.
+  - `EnemyTargetProfiles` and `EnemyAttacks` build the Stage 11 inputs, and `EnemyRules` holds the formulas and baselines.
+- `enemy.behavior`: `EnemyDecisionContext`, `EnemyBehavior`, `EnemyDecision` (`Attack` or `Hold`), `WeightedCandidate` and `EnemyBehaviorRules`.
+- `run.initialization`: `RunInitialization` (the world plus its enemy roster) and `RunInitializer`, which runs world generation and then enemy generation.
+
+All four packages are pure Java: no Spring, JPA or AI, and no randomness except the generators passed in. `EnemyCatalog` is exposed as a Spring bean in `config`.
+
+### Identity and State
+
+- An enemy's runtime identity is `(sceneId, entityId)`: its scene plus the scene-local ID of its `SceneEntity`. There is no separate enemy UUID.
+- Placement (zone, hidden or not) stays in `SceneState`. `EnemyInstance` holds only the mechanical state: definition code, stats, max and current HP, body (each part of its anatomy with a severity) and weapon code.
+- Traits, behaviour weights, attack options and anatomy are static definition data and are not copied into the instance.
+- An instance can represent reduced HP and injured parts. Applying `ResolvedOutcome` effects to enemies is deferred.
+
+### Coherence
+
+Builders and behaviour take an `EnemyCombatant`. Its constructor rejects, as a programming error and before any random draw or Stage 11 call:
+- a definition that is not the instance's;
+- an anatomy that is not the definition's;
+- a body that does not have exactly the anatomy's parts;
+- a weapon that is not the instance's.
+
+`EnemyAttacks` also rejects an attack option that does not belong to the enemy.
+
+### Feeding Stage 11
+
+- `EnemyTargetProfiles` builds `TargetCombatProfile`s keyed by `TargetProfileKey`: the whole enemy plus every present, non-destroyed part. Stage 11 only consumes them, and it is unchanged.
+- `EnemyAttacks` builds Stage 11's `IncomingAttack` from an attack option, the enemy's stats and its weapon definition. It rolls nothing and computes no damage.
+- The flow is: `EnemyDecisionContext` → `EnemyBehavior.decide` → `EnemyDecision.Attack` carrying an `IncomingAttack` → Stage 11 resolves the player's `DEFEND` → `ResolvedOutcome`.
+
+### Decision Boundary
+
+`EnemyDecisionContext(self, recentChoices, attackRef)` is to enemies what `PlayerSceneView` is to the player. It holds the enemy's own checked state and its own recent choices (copied and validated: `HOLD` or one of its options), and nothing about the player. No player stats, passive, ability, inventory or HP are observable yet, so none are given. A reflection test checks that no player or validation type is reachable from it.
+
+### Not Yet Built
+
+There is no turn loop: ordering enemies, prompting the player and applying effects come later. The caller supplies recent choices, because action history is not persisted.
+
 ## Narration Boundary
 
 The narrator should receive a reduced `NarrationContext`, not the full internal object graph.
@@ -131,18 +177,20 @@ Feature-oriented packages under the base package `com.leeburke.springgame`, grow
 - `config` — Spring configuration
 - `shared` — small cross-feature utilities (`DefinitionCodes` code format, `StrictJson` mapper factory); no Spring or JPA
 - `content` — static authored definitions (weapons, passives, abilities, items) loaded from classpath JSON into an immutable catalogue (see `CONTENT.md`)
+  - `content.enemy` — enemy anatomies and definitions, cross-checked against weapons and world entities
   - `content.world` — authored world-generation content (world elements, scene archetypes, regions, fixed scenes) and its catalogue/loader
 - `character` — character generation and character state
 - `mechanics` — checks, DCs, suitability, damage, trauma
 - `action` — the `ActionIntent` contract (steps, payloads, targets, vocabulary)
   - `action.validation` — deterministic validation of an intent against the player-safe view and owned references, and `ValidatedActionIntent`
   - `action.resolution` — the pure deterministic `ActionEngine` turning a validated intent into a `ResolvedOutcome` (no Spring, persistence or AI)
-- `combat`
-- `enemy`
+- `enemy` — enemy run state, generation, Stage 11 profile and attack builders
+  - `enemy.behavior` — weighted-utility enemy decisions behind `EnemyDecisionContext`
 - `world` — region and scene instances, `SceneState` and its integrity rules, `PlayerLocation` (pure Java; region generation will live alongside later)
   - `world.view` — `PlayerSceneView` and its projector: the player-safe boundary
   - `world.generation` — deterministic world generation: `RunWorldGenerator`, topology, archetype selection, scene contents, `CompleteRegionValidator`, and the in-memory aggregates `GeneratedRegion` and `GeneratedRunWorld` (pure Java, no Spring)
 - `run` — run lifecycle and the `GameRun` read model
+  - `run.initialization` — the in-memory starting state of a new run (world plus enemies) and its generator
 - `persistence` — JPA entities, entity/domain mapping, the scene-state JSON codec and the persistence facades (`GameRunStore`, `WorldStore`)
 - `ai` — AI role adapters and deterministic fallbacks
 - `api` — HTTP controllers and request/response DTOs
@@ -193,7 +241,10 @@ The AI provider is deliberately unspecified until the AI integration stage. Do n
 
 - A run's world is generated completely in memory (`world.generation`), producing a `GeneratedRunWorld`: the generation-context snapshot used, the hub, the generated region and the initial player location.
 - Runtime UUIDs come from an injected `IdSource`, kept separate from procedural randomness; they are persistence identity, not part of the reproducibility contract.
-- `WorldStore.initializeWorld(world)` persists it in one transaction. Before any write it re-runs the production `CompleteRegionValidator`, and it fails with `WorldAlreadyInitializedException` if the run already has a world. Inserts are flushed in foreign-key order: generation context and region; then the hub and every region scene; then the initial location. Any failure rolls everything back, so no partial world can remain.
+- `RunInitializer` then generates the starting state of every enemy placed in that world (`EnemyRosterGenerator`), producing a `RunInitialization`. Enemy state is never generated later, on scene entry.
+- `WorldStore.initializeWorld(initialization)` persists it in one transaction. Before any write it re-runs the production `CompleteRegionValidator` and `EnemyRosterValidator`, and it fails with `WorldAlreadyInitializedException` if the run already has a world.
+- Inserts are flushed in foreign-key order: the generation context and region; the hub and every region scene; every enemy and its body parts; then the initial location. Any failure rolls everything back, so no partial world or roster can remain.
+- `WorldStore` stores; it never generates. `EnemyStore` reads enemies back exactly as stored. The scene seed is provenance only: loading never regenerates enemies.
 - There is no replace, reset or reroll operation.
 - `run_generation_context` stores the snapshot as a JSONB document read and written only by `GenerationContextCodec`, with a relational `schema_version` (currently 1); an unsupported version or corrupt document fails clearly.
 
@@ -226,6 +277,12 @@ Composite foreign keys on `(id, run_id)` ensure a scene can only reference a reg
 ### Current Tables (V3)
 
 - `run_generation_context` — keyed by `run_id`: the immutable generation-context snapshot (JSONB) and its `schema_version`. One row per run; its presence marks the run's world as initialized.
+
+### Current Tables (V4)
+
+- `enemy_instance` — keyed by `(scene_id, entity_local_id)`, with a foreign key to `scene_instance`. It holds the definition code, the five stats (3–10), `max_hp` (at least 1), `current_hp` (0 to max) and the weapon code. That the entity exists in the scene's JSONB state is checked by the application.
+- `enemy_body_part` — one row per body part of an enemy (part and severity by enum name), keyed by `(scene_id, entity_local_id, body_part)`.
+- There are no tables for enemy definitions, anatomies, traits, behaviour or attack options, which are static content, and none for action history. Loading checks rows against `EnemyCatalog`; an unknown definition or weapon, or a body that does not match its anatomy, raises `PersistedStateException`.
 
 ### Static Content References
 

@@ -1,0 +1,17 @@
+[
+  {
+    "code": "HUMANOID",
+    "bodyParts": [
+      "HEAD",
+      "NECK",
+      "CHEST",
+      "ABDOMEN",
+      "BACK",
+      "LEFT_ARM",
+      "RIGHT_ARM",
+      "LEFT_LEG",
+      "RIGHT_LEG",
+      "HEART"
+    ]
+  }
+]

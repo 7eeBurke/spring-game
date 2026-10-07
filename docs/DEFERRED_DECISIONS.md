@@ -8,15 +8,15 @@ If a stage requires one of these, flag it and get a decision before implementing
 
 ## Combat and Resolution
 
-- Combat turn loop: ordering of player and enemy actions.
-- Multi-enemy combat details.
+- Combat turn loop: ordering of player and enemy actions, when an enemy decides, and how its incoming attack is presented to the player.
+- Multi-enemy combat details and initiative.
 - Resolving an incoming attack the player does not defend against, and when the enemy's attack happens relative to the player's other steps.
 - Defensive mitigation, and mechanical differences between defense methods (evade type, parry contact, the cover object for `TAKE_COVER`) beyond the stat each uses. The defense stat, DC and the defense-to-`ContactQuality` mapping are in `GAME_RULES.md` "Action Resolution".
 - Mapping from canonical attack methods to universal attack templates.
 - Attack geometry: attack-property shift/override values (height, width, speed, force, reach, commitment) and how they affect defenses.
 - Effectiveness determination (weapon/damage type vs target). The levels and their multipliers are defined in `GAME_RULES.md`; only how a level is chosen is deferred. Resolution currently takes it from the backend-supplied target profile or incoming attack.
 - Attack-form modifier values for trauma (for example deep-cut, penetrating, crushing forms) and how a form is derived. Player attacks currently use the baseline 0.
-- Anatomy interaction modifier values for trauma.
+- Anatomy interaction modifier values for trauma (currently the baseline 0 in both directions).
 - `WHILE` resolution semantics (beyond: genuinely simultaneous, subject to simultaneous-action complexity). A `WHILE` step is currently mechanics-unavailable.
 - Detailed social (`COMMUNICATE`) resolution rules: when speech needs a check, which stat, and its consequences. Communication currently resolves as an automatic success with no consequence.
 - Suitability tables beyond the `FAIR` baseline, and the other DC adjustments (injury, position, environment, passive, targeting, complexity).
@@ -38,9 +38,16 @@ If a stage requires one of these, flag it and get a decision before implementing
 
 ## Enemies
 
-- Exact enemy numbers: stats, HP, protection.
-- Enemy anatomy (which body parts each enemy has), and the `BODY_PART_NOT_PRESENT` validation code.
-- Enemy utility weights.
+Enemy stats, HP, defense DC, attack difficulty, anatomy for the four MVP enemies, and behaviour weights are defined in `GAME_RULES.md` "Enemies". Still deferred:
+- Enemy protection, trauma protection and defensive mitigation beyond the Stage 12 baseline of 0.
+- Non-humanoid anatomies, anatomy-specific values (vital parts, missing parts), visible anatomy in `PlayerSceneView`, and the `BODY_PART_NOT_PRESENT` validation code. An attack on a part an enemy lacks is currently mechanics-unavailable through the missing profile.
+- Hit location of enemy attacks (an enemy attack currently names no body part).
+- Body-part requirements of enemy attacks (for example a destroyed arm preventing a swing).
+- Enemy movement, retreat, cover and defense, and range or positioning as behaviour inputs.
+- What an enemy may observe about the player, and therefore Perception-based exploitation and the `OPPORTUNISTIC` trait (identity only for now).
+- Applying damage to enemies, enemy death and removal.
+- Fated effects on enemies (generation, variants such as the Broken Veteran, behaviour). Fated has no effect on enemies.
+- Persisting enemy decision history; callers currently supply recent choices.
 
 ## Content Mechanics
 

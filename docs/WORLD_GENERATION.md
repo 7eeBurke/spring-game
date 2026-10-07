@@ -195,7 +195,7 @@ Scene identity, run, region, kind, definition code, seed, discovered flag and re
 
 - `zones[]` — meaningful areas (not coordinates or tiles), each with a stable local ID and display name; at least one
 - `connections[]` — undirected movement possibilities between two zones of the scene
-- `entities[]` — placement identity only (local ID, definition code, zone); enemy state comes later
+- `entities[]` — placement identity only (local ID, definition code, zone); enemy mechanical state is kept separately (see Enemy State)
 - `objects[]`, `hazards[]`, `activeEvents[]` — local ID, definition code, zone; mechanics come later
 - `exits[]` — local ID, origin zone, destination scene ID
 - `environmentFlags[]` — scene-wide state flags (codes)
@@ -228,6 +228,12 @@ Determining which zones are visible (line of sight) is deferred. Active events a
 ### Player Location
 
 The run's current location is a scene and a zone within it. It is world state, not character state. The scene must belong to the same run, and the zone must exist in that scene and must not be hidden.
+
+## Enemy State
+
+Every placed entity whose code has an enemy definition (see `CONTENT.md`) gets its mechanical state (stats, HP, body, weapon) when the run's world is generated, including hidden placements. That state is persisted in the same transaction as the world, before play begins. It is never generated lazily on scene entry, and loading never regenerates it.
+
+Each enemy draws from its own random stream, seeded by `WorldRandom.entitySeed(sceneSeed, localId)`: the SplitMix64 derivation used for scenes, with entity domain 3 and a 64-bit FNV-1a hash of the local ID's UTF-8 bytes. Adding, removing or reordering other entities therefore never changes an enemy. A normal enemy makes one draw (its stat shape) and the boss none (see `GAME_RULES.md` "Enemies"). Fated has no effect. The hub has no scene seed and holds no enemies.
 
 ## Persistence
 

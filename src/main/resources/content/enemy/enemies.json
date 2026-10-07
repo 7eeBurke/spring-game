@@ -1,0 +1,64 @@
+[
+  {
+    "code": "HOLLOW_ACOLYTE",
+    "anatomy": "HUMANOID",
+    "weapon": "DAGGER",
+    "statPriority": ["AGILITY", "PERCEPTION", "MIGHT", "RESOLVE", "ARCANA"],
+    "fixedStats": {},
+    "baseHp": 12,
+    "defenseStat": "AGILITY",
+    "traits": ["AGGRESSIVE", "OPPORTUNISTIC"],
+    "holdWeight": 0,
+    "attacks": [
+      { "code": "ACOLYTE_QUICK_SLASH", "method": "SLASH",  "template": "QUICK_SLASH", "weight": 55 },
+      { "code": "ACOLYTE_STAB",        "method": "THRUST", "template": "THRUST",      "weight": 45 }
+    ]
+  },
+  {
+    "code": "BONE_WARDEN",
+    "anatomy": "HUMANOID",
+    "weapon": "WAR_HAMMER",
+    "statPriority": ["MIGHT", "RESOLVE", "PERCEPTION", "AGILITY", "ARCANA"],
+    "fixedStats": {},
+    "baseHp": 20,
+    "defenseStat": "MIGHT",
+    "traits": ["RELENTLESS"],
+    "holdWeight": 0,
+    "attacks": [
+      { "code": "WARDEN_OVERHEAD_SMASH", "method": "SMASH", "template": "OVERHEAD_STRIKE", "weight": 45 },
+      { "code": "WARDEN_HEAVY_SMASH",    "method": "SMASH", "template": "HEAVY_SMASH",     "weight": 35 },
+      { "code": "WARDEN_HAFT_HOOK",      "method": "HOOK",  "template": "HOOK_AND_PULL",   "weight": 20 }
+    ]
+  },
+  {
+    "code": "ASHBOUND_PENITENT",
+    "anatomy": "HUMANOID",
+    "weapon": "EMBER_ROD",
+    "statPriority": ["ARCANA", "RESOLVE", "PERCEPTION", "AGILITY", "MIGHT"],
+    "fixedStats": {},
+    "baseHp": 14,
+    "defenseStat": "AGILITY",
+    "traits": ["CAUTIOUS", "ADAPTIVE"],
+    "holdWeight": 10,
+    "attacks": [
+      { "code": "PENITENT_EMBER_BOLT", "method": "PROJECT", "template": "PROJECTED_ATTACK", "weight": 70 },
+      { "code": "PENITENT_ROD_STRIKE", "method": "SMASH",   "template": "OVERHEAD_STRIKE",  "weight": 20 }
+    ]
+  },
+  {
+    "code": "CHAPEL_GUARDIAN",
+    "anatomy": "HUMANOID",
+    "weapon": "LONGSWORD",
+    "statPriority": [],
+    "fixedStats": { "MIGHT": 10, "AGILITY": 9, "RESOLVE": 8, "PERCEPTION": 5, "ARCANA": 4 },
+    "baseHp": 40,
+    "defenseStat": "MIGHT",
+    "traits": ["AGGRESSIVE", "RELENTLESS"],
+    "holdWeight": 0,
+    "attacks": [
+      { "code": "GUARDIAN_SWEEPING_CUT",    "method": "SLASH",  "template": "HORIZONTAL_SWING", "weight": 40 },
+      { "code": "GUARDIAN_OVERHEAD_CLEAVE", "method": "SLASH",  "template": "OVERHEAD_STRIKE",  "weight": 35 },
+      { "code": "GUARDIAN_LUNGE",           "method": "THRUST", "template": "THRUST",           "weight": 25 }
+    ]
+  }
+]

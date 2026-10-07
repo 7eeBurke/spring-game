@@ -19,7 +19,10 @@ import com.leeburke.springgame.PostgresTestcontainersConfiguration;
 import com.leeburke.springgame.character.PlayerCharacterGenerator;
 import com.leeburke.springgame.character.PlayerStatGenerator;
 import com.leeburke.springgame.content.GameContentCatalog;
+import com.leeburke.springgame.content.enemy.EnemyCatalog;
 import com.leeburke.springgame.content.world.WorldContentCatalog;
+import com.leeburke.springgame.enemy.EnemyRosterGenerator;
+import com.leeburke.springgame.run.initialization.RunInitialization;
 import com.leeburke.springgame.world.PlayerLocation;
 import com.leeburke.springgame.world.SceneExit;
 import com.leeburke.springgame.world.SceneInstance;
@@ -52,6 +55,9 @@ class WorldInitializationIntegrationTest {
 	private WorldContentCatalog worldContent;
 
 	@Autowired
+	private EnemyCatalog enemies;
+
+	@Autowired
 	private JdbcTemplate jdbc;
 
 	private UUID newRun(long seed) {
@@ -61,6 +67,16 @@ class WorldInitializationIntegrationTest {
 
 	private GeneratedRunWorld generate(UUID runId, long seed, GenerationContextSnapshot context) {
 		return new RunWorldGenerator(worldContent, IdSource.random()).generate(runId, seed, context);
+	}
+
+	private RunInitialization withEnemies(GeneratedRunWorld generated) {
+		return new RunInitialization(generated, new EnemyRosterGenerator(enemies).generate(generated));
+	}
+
+	private long enemyRows(GeneratedRunWorld generated) {
+		List<UUID> sceneIds = generated.region().scenes().stream().map(SceneInstance::id).toList();
+		return jdbc.queryForObject("SELECT count(*) FROM enemy_instance WHERE scene_id = ANY (?)", Long.class,
+				(Object) sceneIds.toArray(UUID[]::new));
 	}
 
 	private long rows(String table, UUID runId) {
@@ -79,7 +95,7 @@ class WorldInitializationIntegrationTest {
 		GenerationContextSnapshot context = new GenerationContextSnapshot(List.of("CLOISTER", "SACRISTY"));
 		GeneratedRunWorld generated = generate(runId, 101, context);
 
-		world.initializeWorld(generated);
+		world.initializeWorld(withEnemies(generated));
 
 		assertThat(world.findScene(generated.hub().id())).contains(generated.hub());
 		for (SceneInstance scene : generated.region().scenes()) {
@@ -96,7 +112,7 @@ class WorldInitializationIntegrationTest {
 	void hubPersistsAsHubAndRegionScenesAsRegionScenes() {
 		UUID runId = newRun(102);
 		GeneratedRunWorld generated = generate(runId, 102, GenerationContextSnapshot.empty());
-		world.initializeWorld(generated);
+		world.initializeWorld(withEnemies(generated));
 
 		Map<String, Object> hub = jdbc.queryForMap(
 				"SELECT scene_kind, region_id, scene_seed, definition_code FROM scene_instance WHERE id = ?", generated.hub().id());
@@ -114,7 +130,7 @@ class WorldInitializationIntegrationTest {
 	void playerStartsInTheHubWhoseStoredExitLeadsToTheEntry() {
 		UUID runId = newRun(103);
 		GeneratedRunWorld generated = generate(runId, 103, GenerationContextSnapshot.empty());
-		world.initializeWorld(generated);
+		world.initializeWorld(withEnemies(generated));
 
 		assertThat(world.findPlayerLocation(runId)).contains(new PlayerLocation(generated.hub().id(), "lantern_hearth"));
 		SceneInstance storedHub = world.findScene(generated.hub().id()).orElseThrow();
@@ -126,10 +142,10 @@ class WorldInitializationIntegrationTest {
 	@Test
 	void aRunCannotBeInitializedTwice() {
 		UUID runId = newRun(104);
-		world.initializeWorld(generate(runId, 104, GenerationContextSnapshot.empty()));
+		world.initializeWorld(withEnemies(generate(runId, 104, GenerationContextSnapshot.empty())));
 		long scenesBefore = rows("scene_instance", runId);
 
-		assertThatThrownBy(() -> world.initializeWorld(generate(runId, 999, GenerationContextSnapshot.empty())))
+		assertThatThrownBy(() -> world.initializeWorld(withEnemies(generate(runId, 999, GenerationContextSnapshot.empty()))))
 				.isInstanceOf(WorldAlreadyInitializedException.class);
 		assertThat(rows("scene_instance", runId)).isEqualTo(scenesBefore);
 		assertThat(rows("run_generation_context", runId)).isEqualTo(1);
@@ -149,12 +165,13 @@ class WorldInitializationIntegrationTest {
 				FOR EACH ROW EXECUTE FUNCTION reject_world_state()
 				""");
 		try {
-			assertThatThrownBy(() -> world.initializeWorld(generated)).isInstanceOf(RuntimeException.class);
+			assertThatThrownBy(() -> world.initializeWorld(withEnemies(generated))).isInstanceOf(RuntimeException.class);
 		} finally {
 			jdbc.execute("DROP TRIGGER reject_world_state ON run_world_state");
 			jdbc.execute("DROP FUNCTION reject_world_state()");
 		}
 		assertNoWorldRows(runId);
+		assertThat(enemyRows(generated)).isZero();
 	}
 
 	@Test
@@ -173,7 +190,7 @@ class WorldInitializationIntegrationTest {
 				new GeneratedRegion(region.region(), region.routeStages(), region.optionalSceneIds(), region.bossSceneId(), scenes),
 				generated.start());
 
-		assertThatIllegalArgumentException().isThrownBy(() -> world.initializeWorld(broken))
+		assertThatIllegalArgumentException().isThrownBy(() -> world.initializeWorld(withEnemies(broken)))
 				.withMessageContaining("CHAPEL_GUARDIAN");
 		assertNoWorldRows(runId);
 	}
@@ -181,7 +198,7 @@ class WorldInitializationIntegrationTest {
 	@Test
 	void corruptOrUnsupportedContextFailsClearly() {
 		UUID runId = newRun(107);
-		world.initializeWorld(generate(runId, 107, GenerationContextSnapshot.empty()));
+		world.initializeWorld(withEnemies(generate(runId, 107, GenerationContextSnapshot.empty())));
 
 		jdbc.update("UPDATE run_generation_context SET schema_version = 2 WHERE run_id = ?", runId);
 		assertThatThrownBy(() -> world.findGenerationContext(runId))

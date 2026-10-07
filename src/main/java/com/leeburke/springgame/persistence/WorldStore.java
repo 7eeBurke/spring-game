@@ -11,8 +11,13 @@ import jakarta.persistence.OptimisticLockException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.leeburke.springgame.content.GameContentCatalog;
+import com.leeburke.springgame.content.enemy.EnemyCatalog;
 import com.leeburke.springgame.content.world.RegionDefinition;
 import com.leeburke.springgame.content.world.WorldContentCatalog;
+import com.leeburke.springgame.enemy.EnemyRosterValidator;
+import com.leeburke.springgame.enemy.SceneEnemy;
+import com.leeburke.springgame.run.initialization.RunInitialization;
 import com.leeburke.springgame.world.HiddenContentKind;
 import com.leeburke.springgame.world.PlayerLocation;
 import com.leeburke.springgame.world.RegionInstance;
@@ -36,29 +41,36 @@ public class WorldStore {
 
 	private final EntityManager entityManager;
 	private final WorldContentCatalog worldContent;
+	private final EnemyRosterValidator rosterValidator;
+	private final EnemyInstanceMapper enemyMapper;
 	private final SceneStateCodec codec = new SceneStateCodec();
 	private final GenerationContextCodec contextCodec = new GenerationContextCodec();
 
-	public WorldStore(EntityManager entityManager, WorldContentCatalog worldContent) {
+	public WorldStore(EntityManager entityManager, WorldContentCatalog worldContent, EnemyCatalog enemies,
+			GameContentCatalog content) {
 		this.entityManager = Objects.requireNonNull(entityManager, "entityManager");
 		this.worldContent = Objects.requireNonNull(worldContent, "worldContent");
+		this.rosterValidator = new EnemyRosterValidator(enemies, content);
+		this.enemyMapper = new EnemyInstanceMapper(enemies, content);
 	}
 
 	/**
-	 * Persists a newly generated run world in one transaction: the generation context, the region,
-	 * the hub and every region scene, then the initial player location. Either all of it commits or
-	 * none of it does. The entities have no JPA associations, so inserts are flushed in foreign-key
+	 * Persists a newly generated run in one transaction: the generation context, the region, the hub
+	 * and every region scene, the starting state of every enemy, then the initial player location.
+	 * Either all of it commits or none of it does; enemies are never generated later. The entities have no JPA associations, so inserts are flushed in foreign-key
 	 * order.
 	 * <p>
 	 * Before writing anything, the region is re-validated with the production
-	 * {@link CompleteRegionValidator}, so a hand-built invalid world can never be persisted.
+	 * {@link CompleteRegionValidator} and the enemy roster with {@link EnemyRosterValidator}, so a
+	 * hand-built invalid world or roster can never be persisted. This class stores; it never generates.
 	 *
-	 * @throws IllegalArgumentException          if the generated region is invalid; nothing is written
+	 * @throws IllegalArgumentException          if the generated region or roster is invalid; nothing is written
 	 * @throws WorldAlreadyInitializedException if the run already has a world; nothing is written
 	 */
 	@Transactional
-	public void initializeWorld(GeneratedRunWorld world) {
-		Objects.requireNonNull(world, "world");
+	public void initializeWorld(RunInitialization initialization) {
+		Objects.requireNonNull(initialization, "initialization");
+		GeneratedRunWorld world = initialization.world();
 		UUID runId = world.runId();
 		RegionDefinition definition = worldContent.findRegion(world.region().region().definitionCode())
 				.orElseThrow(() -> new IllegalArgumentException("Unknown region definition "
@@ -66,6 +78,10 @@ public class WorldStore {
 		List<String> problems = new CompleteRegionValidator(definition).problems(world.region());
 		if (!problems.isEmpty()) {
 			throw new IllegalArgumentException("Refusing to persist an invalid generated region for run " + runId + ": " + problems);
+		}
+		List<String> enemyProblems = rosterValidator.problems(world, initialization.enemies());
+		if (!enemyProblems.isEmpty()) {
+			throw new IllegalArgumentException("Refusing to persist an invalid enemy roster for run " + runId + ": " + enemyProblems);
 		}
 		if (entityManager.find(RunGenerationContextEntity.class, runId) != null) {
 			throw new WorldAlreadyInitializedException(runId);
@@ -79,6 +95,11 @@ public class WorldStore {
 
 		insertScene(world.hub());
 		world.region().scenes().forEach(this::insertScene);
+		entityManager.flush();
+
+		for (SceneEnemy enemy : initialization.enemies().enemies()) {
+			entityManager.persist(enemyMapper.toEntity(enemy.sceneId(), enemy.enemy()));
+		}
 		entityManager.flush();
 
 		entityManager.persist(new RunWorldStateEntity(runId, world.start().sceneId(), world.start().zoneId()));

@@ -425,3 +425,73 @@ The player is down once the damage from failed defenses in this intent reaches t
 ### Randomness
 
 Only checks draw randomness: one d20 per rolled step, in step order, from the generator the caller supplies. Automatic, cancelled and unavailable steps draw nothing, so the same intent, state and seed always resolve the same way.
+
+## Enemies
+
+Enemy definitions are static content (see `CONTENT.md`). Each placed enemy gets its own mechanical state when the run's world is generated (see `WORLD_GENERATION.md`).
+
+### Enemy stats
+
+Enemies use the same five stats, each 3 to 10.
+- **Normal enemies:** one draw picks a 27-point shape from the player's `SPECIALIZED` shapes followed by its `EXTREME` shapes, in catalogue order. The values are sorted from high to low and assigned along the enemy's authored stat priority. Every normal enemy therefore totals 27, its strongest stat follows its role, and its weakest stat is at least 3 below its strongest.
+- **The boss** (`CHAPEL_GUARDIAN`) uses its fixed authored block: MIGHT 10, AGILITY 9, RESOLVE 8, PERCEPTION 5, ARCANA 4 (36). It draws nothing.
+
+### Enemy HP
+
+`maxHp = baseHp + (RESOLVE - 6)`, and an enemy starts at full HP with every body part `HEALTHY`. Base HP: acolyte 12, warden 20, penitent 14, guardian 40 (so 42 with RESOLVE 8).
+
+### Defense DC (a player attacking an enemy)
+
+`defenseDc = 10 + modifier(the enemy's authored defensive stat)`. The defensive stat is AGILITY for the acolyte and the penitent, and MIGHT for the warden and the guardian. The modifier is the check stat-modifier table.
+
+### Enemy attack difficulty (the player defending)
+
+`difficulty = 10 + modifier(the enemy's stat for the attack's method)`, using the same method-to-stat table as player attacks (Action Resolution). For example, the penitent's `PROJECT` ember bolt uses ARCANA, and its rod `SMASH` uses its weak MIGHT. Base damage and weapon trauma come from the enemy's weapon definition.
+
+### Stage 12 baselines
+
+These are explicit, replaceable placeholders, like the Action Resolution baselines:
+- effectiveness `NORMAL`, both for player attacks on enemies and for enemy attacks on the player;
+- enemy protection, trauma protection and defensive mitigation 0;
+- anatomy interaction 0 in both directions;
+- enemy attack-form modifier 0;
+- an enemy attack names no body part: no hit location is invented.
+
+### Combat profile of an enemy
+
+A player attack on an enemy uses a profile for the exact target:
+- the DC is the enemy's defense DC, and the baselines above supply everything except the existing injury;
+- **whole enemy (no part named):** existing-injury modifier 0, as on the defense side;
+- **a named part:** the existing-injury modifier of that part's current severity (Trauma);
+- **a part the enemy's anatomy lacks, or a `DESTROYED` part:** there is no profile, so the attack is mechanics-unavailable without a roll. It never falls back to another part or the whole enemy.
+
+### Enemy behaviour
+
+Enemies decide by Java weighted utility, never by AI and never using Fated. An enemy considers its own state and its own recent choices only, never the player's hidden stats, passive, ability or inventory.
+
+**Candidates:** each of the enemy's attack options, in authored order, then `HOLD`. Holding produces no attack. An enemy at 0 HP does not act. Movement, retreat, cover and enemy defense are not candidates yet.
+
+**Final weight** = `max(0, base + trait + pressure - repetition)`, calculated once, in whole numbers:
+
+| Part | Rule |
+|---|---|
+| Base | the option's weight; `HOLD` uses the enemy's hold weight |
+| `AGGRESSIVE` | `HOLD` −10 |
+| `CAUTIOUS` | `HOLD` +10 |
+| Pressure | when **desperate** (`2 × currentHp <= maxHp`), `HOLD` + `5 × max(0, 7 − RESOLVE)`: RESOLVE 3 adds 20, 5 adds 10, 6 adds 5, 7 or more adds nothing |
+| `RECKLESS` | ignores pressure |
+| Repetition | the caller passes the enemy's recent choices. In the last 2, each occurrence of a candidate costs it 15 |
+| `ADAPTIVE` | repetition costs 30 per occurrence |
+| `RELENTLESS` | no repetition penalty |
+| `OPPORTUNISTIC` | no effect yet: it needs an observable player weakness |
+
+**Selection:** one draw of a whole number in `[0, total)`. The chosen candidate is the first whose running total exceeds the draw, so a candidate with weight 0 is never chosen. If every weight is 0, the enemy holds without a draw. A chosen attack becomes the incoming attack the player defends against (Action Resolution); the enemy subsystem never rolls the defense or computes damage.
+
+Bundled base weights:
+
+| Enemy | Weights |
+|---|---|
+| Acolyte | quick slash 55, stab 45, hold 0 (−10 for AGGRESSIVE, clamped to 0) |
+| Warden | overhead smash 45, heavy smash 35, haft hook 20, hold 0 |
+| Penitent | ember bolt 70, rod strike 20, hold 10 + 10 (CAUTIOUS) = 20 |
+| Guardian | sweeping cut 40, overhead cleave 35, lunge 25, hold 0 |
