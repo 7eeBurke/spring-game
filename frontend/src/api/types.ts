@@ -67,3 +67,52 @@ export interface CreateRunResponse {
 export interface ApiErrorBody {
   error: { code: string; message: string; reason?: string; hint?: string };
 }
+
+// Stage 15A chronicle (com.leeburke.springgame.game.view.ChronicleView).
+
+export interface ChronicleOpening {
+  introduction: NarrationView | null;
+  scene: string;
+  zone: string;
+}
+
+export interface ChronicleAction {
+  text: string;
+  kind: 'FREE_TEXT' | 'COMMAND';
+}
+
+export interface ChroniclePlace {
+  scene: string;
+  zone: string | null;
+}
+
+export interface ChronicleEnemy {
+  attacker: string;
+  action: 'ATTACK' | 'HOLD';
+  cueText: string | null;
+  narration: NarrationView | null;
+}
+
+export interface ChronicleTurn {
+  turnNumber: number;
+  /** Null for turns recorded before the player's wording was kept. */
+  action: ChronicleAction | null;
+  enteredScene: ChroniclePlace | null;
+  /** Null while the turn's narration is still being finalised. */
+  narration: NarrationView | null;
+  narrationPending: boolean;
+  enemy: ChronicleEnemy | null;
+  ending: 'DEAD' | 'VICTORIOUS' | null;
+}
+
+export interface ChronicleView {
+  runId: string;
+  status: RunStatus;
+  latestTurnNumber: number;
+  /** Present only on the page that reaches the start of the run. */
+  opening: ChronicleOpening | null;
+  /** Oldest first. */
+  turns: ChronicleTurn[];
+  /** Cursor for the next older page, or null at the start. */
+  nextBefore: number | null;
+}

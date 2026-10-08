@@ -23,6 +23,10 @@ test('creates a tale, survives a lost response and resumes after reload', async 
     if (creationCalls.length === 1) return route.abort('connectionreset'); // the response is lost
     return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ runId: RUN_ID, view }) });
   });
+  await page.route(`**/api/v1/runs/${RUN_ID}/chronicle*`, (route) => route.fulfill({ json: {
+    runId: RUN_ID, status: 'ACTIVE', latestTurnNumber: 0, turns: [], nextBefore: null,
+    opening: { introduction: view.introduction, scene: 'The Last Lantern', zone: 'Lantern Hearth' },
+  } }));
   await page.route(`**/api/v1/runs/${RUN_ID}`, (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(view) }));
 

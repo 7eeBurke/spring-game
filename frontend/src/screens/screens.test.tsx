@@ -4,12 +4,17 @@ import { describe, expect, it, vi } from 'vitest';
 import { PreviewApp } from '../preview/PreviewApp';
 import { generateRunToken, newUuid } from '../security/tokens';
 import { addRun, listRuns } from '../storage/vault';
-import { apiError, fakeApi, json, networkFailure, RUN_ID, sampleView } from '../test/fakeApi';
+import { apiError, chroniclePage, fakeApi, fakeServer, json, networkFailure, RUN_ID, sampleView, turn, type RecordedCall } from '../test/fakeApi';
+
+/** Creation goes to `create`; the story screen's chronicle read gets an empty chronicle. */
+function routed(call: RecordedCall, create: () => Response): Response {
+  return call.url.includes('/chronicle') ? json(200, chroniclePage(1, 0)) : create();
+}
 import { App } from '../App';
 
 describe('the shelf', () => {
   it('starts a new tale with the invite code and opens it', async () => {
-    const api = fakeApi(() => json(201, { runId: RUN_ID, view: sampleView() }));
+    const api = fakeApi((call) => routed(call, () => json(201, { runId: RUN_ID, view: sampleView() })));
     const user = userEvent.setup();
     render(<App />);
 
@@ -19,13 +24,13 @@ describe('the shelf', () => {
     await user.click(screen.getByRole('button', { name: 'Begin' }));
 
     expect(await screen.findByRole('button', { name: /Character details: Wren/ })).toBeInTheDocument();
-    expect(screen.getByLabelText('Introduction')).toHaveTextContent('You are Wren.');
-    expect(api.calls).toHaveLength(1);
+    expect(await screen.findByLabelText('Introduction')).toHaveTextContent('You are Wren.');
+    expect(api.calls.filter((c) => c.method === 'POST')).toHaveLength(1);
     expect(listRuns()[0]!.runId).toBe(RUN_ID);
   });
 
   it('retries a lost creation from the same form with the same credentials, never a second run', async () => {
-    const api = fakeApi((_, i) => (i === 0 ? networkFailure() : json(201, { runId: RUN_ID, view: sampleView() })));
+    const api = fakeApi((call, i) => routed(call, () => (i === 0 ? networkFailure() : json(201, { runId: RUN_ID, view: sampleView() }))));
     const user = userEvent.setup();
     render(<App />);
     await user.click(screen.getByRole('button', { name: 'Begin a new tale' }));
@@ -37,9 +42,10 @@ describe('the shelf', () => {
     await user.click(within(form).getByRole('button', { name: 'Finish creating' }));
 
     expect(await screen.findByRole('button', { name: /Character details: Wren/ })).toBeInTheDocument();
-    expect(api.calls).toHaveLength(2);
-    expect(api.calls[1]!.headers.Authorization).toBe(api.calls[0]!.headers.Authorization);
-    expect(api.calls[1]!.headers['Idempotency-Key']).toBe(api.calls[0]!.headers['Idempotency-Key']);
+    const posts = api.calls.filter((c) => c.method === 'POST');
+    expect(posts).toHaveLength(2);
+    expect(posts[1]!.headers.Authorization).toBe(posts[0]!.headers.Authorization);
+    expect(posts[1]!.headers['Idempotency-Key']).toBe(posts[0]!.headers['Idempotency-Key']);
     expect(listRuns()).toHaveLength(1);
   });
 
@@ -84,7 +90,7 @@ describe('the shelf', () => {
     addRun({ localId: newUuid(), runId: RUN_ID, token: generateRunToken(), creationKey: newUuid(),
       createdAt: '2026-10-08T00:00:00.000Z', lastOpenedAt: null,
       summary: { characterName: 'Wren', status: 'DEAD', region: 'Hollow Chapel', scene: 'Ossuary', hp: 0, maxHp: 24 } });
-    fakeApi(() => json(200, sampleView({ status: 'DEAD' })));
+    fakeServer(3, sampleView({ status: 'DEAD' }), (n) => turn(n, n === 3 ? { ending: 'DEAD' } : {}));
     const user = userEvent.setup();
     render(<App />);
 
@@ -114,7 +120,7 @@ describe('the shelf', () => {
     const token = generateRunToken();
     const { encodeRecoveryCode } = await import('../security/recovery');
     const code = await encodeRecoveryCode(RUN_ID, token);
-    fakeApi(() => json(200, sampleView()));
+    fakeServer(0);
     const user = userEvent.setup();
     render(<App />);
 

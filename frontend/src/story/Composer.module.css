@@ -79,6 +79,47 @@
   cursor: not-allowed;
 }
 
+.ended {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--tap);
+}
+
+.endedText {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.05rem;
+  color: var(--color-text-muted);
+}
+
+.endedButton,
+.statusButton {
+  flex-shrink: 0;
+  min-height: var(--tap);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-text-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+  font-size: var(--text-small);
+  line-height: 1.4;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
 .note {
   margin-top: var(--space-1);
   font-size: var(--text-label);

@@ -1,0 +1,55 @@
+.older {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 var(--space-5);
+}
+
+.olderButton,
+.pill,
+.retry {
+  min-height: var(--tap);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.olderButton:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.sentinel {
+  height: 1px;
+}
+
+/* "New passage" indicator: shown only when the reader is further up. */
+.pill {
+  border-color: var(--color-gold-dim);
+  color: var(--color-gold);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+
+.notice {
+  margin: var(--space-4) 0;
+  padding: var(--space-3);
+  border-left: var(--attack-rule);
+  background: var(--color-ember-wash);
+  font-size: 1rem;
+}
+
+.notice p + * {
+  margin-top: var(--space-2);
+}
+
+.loading {
+  margin: var(--space-6) 0;
+  text-align: center;
+  font-family: var(--font-display);
+  font-style: italic;
+  color: var(--color-text-muted);
+}

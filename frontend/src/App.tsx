@@ -17,7 +17,7 @@ export function App() {
   }, []);
 
   if (screen.kind === 'story') {
-    return <StoryScreen view={screen.view} onBack={() => setScreen({ kind: 'shelf' })} />;
+    return <StoryScreen key={screen.entry.localId} entry={screen.entry} view={screen.view} onBack={() => setScreen({ kind: 'shelf' })} />;
   }
   return <ShelfScreen onOpen={(entry, view) => setScreen({ kind: 'story', entry, view })} />;
 }

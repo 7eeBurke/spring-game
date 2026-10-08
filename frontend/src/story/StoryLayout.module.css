@@ -11,9 +11,32 @@
   background: var(--color-bg);
 }
 
+.middle {
+  position: relative;
+  min-height: 0;
+  display: grid;
+}
+
+.overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--space-3);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.overlay > * {
+  pointer-events: auto;
+}
+
 .chronicle {
   min-height: 0;
   overflow-y: auto;
+  /* Scroll position is managed by the app when older passages are prepended; browser scroll
+     anchoring would apply the same correction a second time. */
+  overflow-anchor: none;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   scroll-padding-bottom: var(--space-6);

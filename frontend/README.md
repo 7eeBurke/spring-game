@@ -27,12 +27,19 @@ The preview shows the story screen with hand-written **sample** text. It never c
 
 The `npm run e2e` run saves screenshots to `test-results/screens/`.
 
+## Real-backend check (opt-in)
+
+`e2e/real-backend.spec.ts` plays 25 slash-command turns against a local Spring Boot server with AI
+disabled. It then restores the whole chronicle in the browser from PostgreSQL. It is skipped unless
+`E2E_REAL_API=1`; the commands are in the spec's header comment. The turn-limit override in those commands is a test-only
+command-line argument; production defaults are unchanged.
+
 ## Playing a real run
 
 1. Start Spring Boot with an invite code. See `../README_SETUP.md`, "Play Through the API".
 2. Open http://localhost:5173.
 
-Stage 15B covers creating, resuming and recovering tales, and a story view of the current state. The full chronicle (15C) and playing turns (15D) come next.
+Creating, resuming and recovering tales work, and the story screen restores the full chronicle (Stage 15C). Playing turns from the screen comes in 15D.
 
 ## Where things live
 
@@ -40,5 +47,7 @@ Stage 15B covers creating, resuming and recovering tales, and a story view of th
 - `src/security`: run tokens and recovery codes.
 - `src/storage/vault.ts`: saved runs in localStorage. Credentials are saved before the creation request is sent.
 - `src/runs`: create, retry, open and import runs.
+- `src/chronicle`: chronicle state (merge, pagination, gap-safe refresh), the scroll behaviour and the live story data.
+- `src/reveal`: paragraph reveal (`revealConfig.ts` sets the timing) and reduced motion.
 - `src/story`: storybook components shared by the real screens and the preview.
 - `src/styles/tokens.css`: every colour, size and timing. Tune the presentation here.

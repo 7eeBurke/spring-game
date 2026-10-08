@@ -7,6 +7,61 @@
   margin-top: 0.85em;
 }
 
+/* New narration: paragraphs wait invisibly in place, then fade in one by one. */
+.narration p[data-hidden] {
+  opacity: 0;
+}
+
+.fresh p:not([data-hidden]) {
+  animation: reveal var(--reveal-fade) ease-out;
+}
+
+.narration[data-revealing] {
+  cursor: pointer;
+}
+
+/* Keyboard path to skip the reveal: invisible until focused. */
+.skip {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+  padding: 0;
+}
+
+.skip:focus-visible {
+  position: static;
+  width: auto;
+  height: auto;
+  clip: auto;
+  display: block;
+  margin-bottom: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-gold-dim);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-gold);
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+@keyframes reveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* A quiet, factual note: an enemy holding back, or words that were not recorded. */
+.quiet {
+  margin: 0 0 var(--passage-gap);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.05rem;
+  color: var(--color-text-muted);
+}
+
 .introduction p:first-child::first-letter {
   font-family: var(--font-display);
   font-size: 3.1em;

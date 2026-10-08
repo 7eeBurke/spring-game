@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Composer, DefenseBanner } from '../story/Composer';
+import { EndedFooter } from '../story/EndedFooter';
 import { CharacterPanel, ScenePanel } from '../story/Panels';
 import { EndingPassage, IncomingAttack, NarrationPassage, PendingNarration, PlayerPassage, SceneHeading } from '../story/Passages';
 import { Sheet } from '../story/Sheet';
@@ -45,11 +46,11 @@ export function PreviewApp() {
       hp={hp} maxHp={SAMPLE_CHARACTER.maxHp}
       onOpenCharacter={() => setSheet('character')} onOpenScene={() => setSheet('scene')} />
   );
-  const footer = (
+  const footer = ended ? <EndedFooter ending="DEAD" /> : (
     <>
       {mode === 'defense' && <DefenseBanner attacker={SAMPLE_ATTACK.attacker} cueText={SAMPLE_ATTACK.cueText} />}
-      <Composer disabled={ended} placeholder={mode === 'defense' ? 'How do you defend?' : 'What do you do?'}
-        note={ended ? 'This tale has ended.' : 'Design preview: sending is not available here.'} />
+      <Composer placeholder={mode === 'defense' ? 'How do you defend?' : 'What do you do?'}
+        note="Design preview: sending is not available here." />
     </>
   );
 

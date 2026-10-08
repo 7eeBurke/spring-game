@@ -1,14 +1,32 @@
+import { useState } from 'react';
 import type { NarrationView } from '../api/types';
+import { useParagraphReveal } from '../reveal/useParagraphReveal';
 import { toParagraphs } from './paragraphs';
 import styles from './Passages.module.css';
 
 // Every piece of game text is rendered as React text children: never as HTML.
 
-export function NarrationPassage({ narration, intro = false }: { narration: NarrationView; intro?: boolean }) {
+export interface NarrationPassageProps {
+  narration: NarrationView;
+  intro?: boolean;
+  /** New narration from live play: reveal it paragraph by paragraph. Recovered narration never animates. */
+  reveal?: boolean;
+  /** Called once the passage is fully shown (or immediately when not revealing). */
+  onRevealed?: () => void;
+}
+
+export function NarrationPassage({ narration, intro = false, reveal = false, onRevealed }: NarrationPassageProps) {
+  const paragraphs = toParagraphs(narration.text);
+  const { visible, revealing, revealAll } = useParagraphReveal(paragraphs.length, reveal, onRevealed);
+  // Whether this passage arrived as new: keeps its fade even after the reveal settles.
+  const [arrivedNew] = useState(reveal);
   return (
-    <section className={`${styles.passage} ${styles.narration} ${intro ? styles.introduction : ''}`}
-      aria-label={intro ? 'Introduction' : 'Narration'}>
-      {toParagraphs(narration.text).map((paragraph, i) => <p key={i}>{paragraph}</p>)}
+    <section className={`${styles.passage} ${styles.narration} ${intro ? styles.introduction : ''} ${arrivedNew ? styles.fresh : ''}`}
+      aria-label={intro ? 'Introduction' : 'Narration'} data-revealing={revealing ? '' : undefined}
+      onClick={revealing ? revealAll : undefined}>
+      {revealing && <button type="button" className={styles.skip} onClick={revealAll}>Show the whole passage</button>}
+      {/* Hidden paragraphs keep their space (no layout jump) and stay readable to screen readers. */}
+      {paragraphs.map((paragraph, i) => <p key={i} data-hidden={i >= visible ? '' : undefined}>{paragraph}</p>)}
       {narration.source === 'FALLBACK' && <small className={styles.plain}>Told plainly — the storyteller was unavailable</small>}
     </section>
   );
@@ -60,6 +78,12 @@ export function EndingPassage({ ending }: { ending: 'DEAD' | 'VICTORIOUS' }) {
   );
 }
 
+/** A turn whose outcome is confirmed but whose telling has not been saved yet. Not a live region. */
 export function PendingNarration() {
-  return <p className={styles.pending} role="status">The storyteller is still writing…</p>;
+  return <p className={styles.pending}>The telling of this turn has not arrived yet.</p>;
+}
+
+/** A quiet factual line confirmed by the game (an enemy holding back), not narration. */
+export function QuietNote({ children }: { children: string }) {
+  return <p className={styles.quiet}>{children}</p>;
 }

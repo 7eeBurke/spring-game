@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 import { setFetcher } from '../api/client';
-import type { GameView } from '../api/types';
+import type { ChronicleTurn, ChronicleView, GameView } from '../api/types';
 
 export interface RecordedCall {
   url: string;
@@ -61,4 +61,56 @@ export function sampleView(overrides: Partial<GameView> = {}): GameView {
     lastTurn: null,
     ...overrides,
   };
+}
+
+
+/** A committed turn as the chronicle API returns it. */
+export function turn(n: number, overrides: Partial<ChronicleTurn> = {}): ChronicleTurn {
+  return {
+    turnNumber: n,
+    action: { text: `/hold ${n}`, kind: 'COMMAND' },
+    enteredScene: null,
+    narration: { text: `Narration of turn ${n}.`, source: 'AI' },
+    narrationPending: false,
+    enemy: null,
+    ending: null,
+    ...overrides,
+  };
+}
+
+/** A chronicle page for turns [from..to], with the opening when it reaches turn 1. */
+export function chroniclePage(from: number, to: number, overrides: Partial<ChronicleView> = {}): ChronicleView {
+  const turns = [];
+  for (let n = from; n <= to; n++) turns.push(turn(n));
+  return {
+    runId: RUN_ID,
+    status: 'ACTIVE',
+    latestTurnNumber: to,
+    opening: from <= 1 ? { introduction: { text: 'You are Wren.', source: 'AI' }, scene: 'The Last Lantern', zone: 'Lantern Hearth' } : null,
+    turns,
+    nextBefore: from <= 1 ? null : from,
+    ...overrides,
+  };
+}
+
+/** A fake server holding `total` turns that serves the view and chronicle pages like the real API. */
+export function fakeServer(total: number, view: GameView = sampleView(), turnFor: (n: number) => ChronicleTurn = (n) => turn(n)) {
+  const state = { total, view, turnFor };
+  const api = fakeApi((call) => {
+    if (call.method !== 'GET') return apiError(405, 'METHOD');
+    const url = new URL(call.url, 'http://localhost');
+    if (url.pathname.endsWith('/chronicle')) {
+      const limit = Number(url.searchParams.get('limit') ?? '20');
+      const before = Number(url.searchParams.get('before') ?? String(state.total + 1));
+      const to = Math.min(before - 1, state.total);
+      const from = Math.max(1, to - limit + 1);
+      const page = chroniclePage(to < 1 ? 1 : from, to, { latestTurnNumber: state.total });
+      page.turns = to < 1 ? [] : page.turns.map((t) => state.turnFor(t.turnNumber));
+      page.nextBefore = from > 1 ? from : null;
+      page.opening = from <= 1 ? chroniclePage(1, 0).opening : null;
+      return json(200, page);
+    }
+    return json(200, state.view);
+  });
+  return { ...api, state };
 }
