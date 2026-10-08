@@ -111,6 +111,10 @@ public class SceneInstanceEntity {
 		return discovered;
 	}
 
+	void markDiscovered() {
+		this.discovered = true;
+	}
+
 	long getRevision() {
 		return revision;
 	}

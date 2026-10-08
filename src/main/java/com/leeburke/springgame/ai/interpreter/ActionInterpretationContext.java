@@ -18,7 +18,7 @@ public record ActionInterpretationContext(
 		String currentZone,
 		List<Zone> zones,
 		List<Connection> connections,
-		List<Thing> entities,
+		List<Creature> entities,
 		List<Thing> objects,
 		List<Thing> hazards,
 		List<Exit> exits,
@@ -53,7 +53,17 @@ public record ActionInterpretationContext(
 	public record Connection(String zoneA, String zoneB) {
 	}
 
-	/** A visible entity, object or hazard: alias, display name and zone alias. */
+	/** Whether a visible creature can still fight. A FALLEN creature is at 0 HP: still present, never acting. */
+	public enum Condition {
+		ACTIVE,
+		FALLEN
+	}
+
+	/** A visible creature: alias, display name, zone alias and condition. */
+	public record Creature(String alias, String name, String zone, Condition condition) {
+	}
+
+	/** A visible object or hazard: alias, display name and zone alias. */
 	public record Thing(String alias, String name, String zone) {
 	}
 

@@ -48,12 +48,22 @@ public final class ActionDocumentSchema {
 	}
 
 	static ObjectNode schema() {
-		ObjectNode target = object(map(
-				"kind", enumOf(ActionDocument.TargetKind.values()),
-				"alias", nullable("string"),
-				"bodyPart", nullableEnum(BodyPart.values()),
-				"specificity", enumOf(TargetSpecificity.values())),
-				"kind", "alias", "bodyPart", "specificity");
+		ObjectNode target = described(object(map(
+				"kind", described(enumOf(ActionDocument.TargetKind.values()),
+						"What the target is. ENTITY, OBJECT, HAZARD, ZONE and EXIT name something in the context by alias; "
+								+ "SELF is the player; NONE means no target."),
+				"alias", described(nullable("string"),
+						"The context alias whose prefix matches kind (entity_N for ENTITY, object_N for OBJECT, and so on). "
+								+ "null for SELF and NONE."),
+				"bodyPart", described(nullableEnum(BodyPart.values()),
+						"Only for ENTITY or SELF when the player names a body part; otherwise null."),
+				"specificity", described(enumOf(TargetSpecificity.values()),
+						"EXPLICIT if the player named or clearly described the target; INFERRED if you identified it from "
+								+ "context (for example 'it' or the only enemy). Every kind except NONE must be EXPLICIT or "
+								+ "INFERRED. UNSPECIFIED is only for kind NONE.")),
+				"kind", "alias", "bodyPart", "specificity"),
+				"A target. Example: 'I slash at the acolyte' -> {kind: ENTITY, alias: entity_1, bodyPart: null, "
+						+ "specificity: EXPLICIT}. No target -> {kind: NONE, alias: null, bodyPart: null, specificity: UNSPECIFIED}.");
 
 		ObjectNode attack = object(map("weapon", type("string"), "method", enumOf(WeaponMethod.values()),
 				"template", enumOf(AttackTemplate.values()), "target", target.deepCopy(),
@@ -111,6 +121,12 @@ public final class ActionDocumentSchema {
 		}
 		node.set("required", required);
 		node.put("additionalProperties", false);
+		return node;
+	}
+
+	/** Adds guidance for the model; descriptions never change the schema's structure. */
+	private static ObjectNode described(ObjectNode node, String description) {
+		node.put("description", description);
 		return node;
 	}
 

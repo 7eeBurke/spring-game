@@ -215,6 +215,7 @@ communicate = { kind, content, target }
 
 - Exactly the payload matching `action` is non-null.
 - Scene target kinds need an alias; `SELF` and `NONE` have none. Only `ENTITY` and `SELF` may name a body part.
+- Every target kind except `NONE` identifies something, so its `specificity` is `EXPLICIT` (the player named it) or `INFERRED` (identified from context). `NONE` is always `UNSPECIFIED`. This mirrors Stage 10 and is checked during parsing, so a violation is reported with its field path (for example `steps[0].attack.target`) and repaired once like any other structure problem. The schema's property descriptions and the prompt state the same rule.
 - `supported: false` means the input is not an in-world action, and the document has no steps.
 - Java numbers the steps `s1..sn`. Every value uses the Stage 10 vocabulary.
 - **There is no mechanical field**: no stat, suitability, DC, roll, success, damage, trauma, contact, effectiveness, HP, injury, condition or reward. A model that adds one fails strict parsing.
@@ -370,7 +371,7 @@ The introduction is generated once per run and persisted; reloading returns the 
 
 ## Prompts
 
-- **Location:** each role's instructions are a versioned classpath resource, `src/main/resources/ai/prompts/<role>-v<version>.txt`. The Outcome Narrator is at version 2 (attempts, spoken words and player wording); the other roles are at version 1. Superseded prompt files are kept for history; only the current version is loaded.
+- **Location:** each role's instructions are a versioned classpath resource, `src/main/resources/ai/prompts/<role>-v<version>.txt`. The Outcome Narrator is at version 2 (attempts, spoken words and player wording) and the Action Interpreter at version 2 (target kind, alias and specificity rules, with a worked example); the other roles are at version 1. Superseded prompt files are kept for history; only the current version is loaded.
 - **Versions** are operational metadata for prompt evolution, separate from rules, content and schema versions. The persisted introduction records the prompt version that produced it.
 - **Prompts are application configuration**, not game content, and are never stored in the database.
 - **Request shape:** each request sends the role's instructions separately from a single JSON user message. Player text, when present, is only a string value inside that message.
@@ -389,3 +390,27 @@ Failures are classified as `DISABLED`, `NOT_CONFIGURED`, `TIMEOUT`, `AUTHENTICAT
 Each call writes one log line with the role, prompt version, model, latency, attempts, outcome and the token usage the provider reported (input, cached input, output and reasoning tokens; the interpreter sums its attempts). Usage is operational metadata only: logged, never persisted, never game state. Keys, headers, player text, prompts, model output and game state are never logged, and model reasoning is never requested or stored.
 
 The game remains mechanically playable without a live model.
+
+## Orchestration and Cost (Stage 14)
+
+**When each role runs:**
+- **The Action Interpreter** runs only for a new free-text turn whose view is current. It never runs for slash commands, replays or stale requests.
+- **The Outcome Narrator** runs once per committed turn.
+- **The Enemy Attack Narrator** runs once per new pending attack.
+- **The Character Introduction** is generated once per run, at creation.
+
+**No transaction during model calls.** Every model call happens with no database transaction open.
+
+**Stored narration.**
+- Narrations are stored with the turn's response, and attack narration on `pending_attack`. Replays and `GET` reuse them and never call a model.
+- While a turn's narration is pending, the view shows its mechanics with `finalizing: true` and no narration. The pending attack's Java `cueText` is always present.
+
+**One narration per turn.** A narration lease ensures that concurrent requests narrate a committed turn once.
+
+**Transient failures.** A transient interpreter failure (`AI_UNAVAILABLE`) releases the request's idempotency key, so the same request can be retried. The answer is `INTERPRETATION_FAILED` with reason `AI_UNAVAILABLE` and a slash-command hint.
+
+**Daily budget.**
+- `BudgetedAiProvider` wraps a configured provider with a global daily cap: `game.ai.daily-call-limit`, default 500 calls per UTC day, kept in memory.
+- Past the cap, calls fail as `RATE_LIMITED` without reaching the provider. The interpreter then reports `AI_UNAVAILABLE`, and the narrators fall back.
+
+**NPC scope.** COMMUNICATE addressed to an enemy is narrated as spoken. There is no reply, reaction or persuasion, and no dialogue role; NPC dialogue is deferred.

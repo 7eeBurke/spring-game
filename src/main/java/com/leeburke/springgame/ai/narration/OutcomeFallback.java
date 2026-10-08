@@ -6,7 +6,6 @@ import java.util.StringJoiner;
 
 import com.leeburke.springgame.action.ActionType;
 import com.leeburke.springgame.action.CommunicationKind;
-import com.leeburke.springgame.action.resolution.CancellationReason;
 import com.leeburke.springgame.ai.narration.AttemptedAction.TargetKind;
 import com.leeburke.springgame.mechanics.BodyPart;
 
@@ -49,15 +48,21 @@ public final class OutcomeFallback {
 			case NarrationFact.PlayerStayed s -> s.attemptedZone()
 					.map(zone -> "You cannot reach the " + zone + " from here, and stay in the " + s.zone() + ".")
 					.orElse("You hold your ground in the " + s.zone() + ".");
+			case NarrationFact.PlayerLeftScene l -> "You leave through the exit and arrive in the " + l.arrivalZone()
+					+ " of " + withArticle(l.destinationScene()) + ".";
+			case NarrationFact.ExitNotReached x -> "The exit is not within reach from the " + x.zone()
+					+ "; you would have to move to it first.";
 			case NarrationFact.PlayerSpoke s -> {
 				String said = "You " + s.addressee().map(name -> speech(s.kind()) + " the " + name)
 						.orElse(word(s.kind().name()) + " aloud");
 				yield s.attempt().spokenWords().map(words -> said + ": \"" + words + "\"").orElse(said + ".");
 			}
-			case NarrationFact.StepCancelled c -> (c.reason() == CancellationReason.PLAYER_DOWN
-					? "You fall before you can " + phrase(c.attempt())
-					: "You do not follow through with your attempt to " + phrase(c.attempt()))
-					+ (c.action() == ActionType.COMMUNICATE ? ", and nothing is said." : ".");
+			case NarrationFact.StepCancelled c -> (switch (c.reason()) {
+				case PLAYER_DOWN -> "You fall before you can " + phrase(c.attempt());
+				case TARGET_DEFEATED -> "There is no need to " + phrase(c.attempt()) + ": it has already fallen";
+				case LEFT_SCENE -> "You are gone before you can " + phrase(c.attempt());
+				case PREVIOUS_STEP_NOT_SUCCESSFUL -> "You do not follow through with your attempt to " + phrase(c.attempt());
+			}) + (c.action() == ActionType.COMMUNICATE ? ", and nothing is said." : ".");
 			case NarrationFact.StepHadNoEffect n -> "Nothing comes of your attempt to " + phrase(n.attempt()) + ".";
 		};
 	}
@@ -112,5 +117,10 @@ public final class OutcomeFallback {
 
 	private static String word(String constant) {
 		return constant.toLowerCase(Locale.ROOT).replace('_', ' ');
+	}
+
+	/** "the Ossuary", but "The Last Lantern" as named. */
+	private static String withArticle(String name) {
+		return name.startsWith("The ") ? name : "the " + name;
 	}
 }

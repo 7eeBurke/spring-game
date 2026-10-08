@@ -163,9 +163,9 @@ Builders and behaviour take an `EnemyCombatant`. Its constructor rejects, as a p
 
 `EnemyDecisionContext(self, recentChoices, attackRef)` is to enemies what `PlayerSceneView` is to the player. It holds the enemy's own checked state and its own recent choices (copied and validated: `HOLD` or one of its options), and nothing about the player. No player stats, passive, ability, inventory or HP are observable yet, so none are given. A reflection test checks that no player or validation type is reachable from it.
 
-### Not Yet Built
+### Turn Loop
 
-There is no turn loop: ordering enemies, prompting the player and applying effects come later. The caller supplies recent choices, because action history is not persisted.
+Stage 14 runs enemies inside the turn pipeline (see "Application Layer"): one living, visible enemy acts per eligible turn, chosen round-robin, and its recent choices come from the persisted turn records (`run_turn.enemy_choice`).
 
 ## AI Boundary
 
@@ -368,3 +368,126 @@ Composite foreign keys on `(id, run_id)` ensure a scene can only reference a reg
 - Loading across changed static-content versions is not guaranteed (see `CONTENT.md` and `DEFERRED_DECISIONS.md`).
 
 Player and run state is relational. JSONB is used only for the dynamic `SceneState`, not for simple fixed state.
+
+## Application Layer (Stage 14)
+
+The `game` package holds pure-Java turn rules; `game.service` orchestrates them with the stores; `api` is a thin REST layer.
+
+### Packages
+
+| Package | Contents | Spring |
+|---|---|---|
+| `game` | `GameSnapshot`, `ResolutionContextFactory`, `EffectApplier`, `ExitTraversal`, `EncounterRules`, `DefenseGate`, `TerminalRules`, `TurnRandom`, `RunSession`, `PendingAttack`, `RunStatus`, `TurnStatus` | no |
+| `game.service` | `RunCreationService`, `TurnService`, `NarrationFinalizer`, `GameViewAssembler`/`GameViewService`, `RunAccessService`, `AbuseLimits` | yes |
+| `game.view` | response records: `GameView`, `TurnResponse`, `CreateRunResponse`, `ApiErrorResponse` | no |
+| `api` | `RunController`, `TurnController`, `RunTokenInterceptor`, `ApiExceptionHandler`, `RequestSizeLimitFilter` | yes |
+
+The orchestrators are deliberately **not** `@Transactional`. Each phase runs in its own short transaction from a `TransactionTemplate`, so **no database transaction is ever open while a model is called**. The pure engine classes (`ActionEngine`, `EnemyBehavior`, generators, `ResolutionContextFactory`) are plain Java, constructed as beans in `GameConfiguration`.
+
+### Run Lifecycle
+
+`run_session.status` goes `INITIALIZING -> ACTIVE -> DEAD | VICTORIOUS`. Only `ACTIVE` runs accept turns; every state can be read except `INITIALIZING`.
+
+Creation is idempotent and resumable:
+1. **Transaction A:** a `SecureRandom` run seed, the character (seeded from it), `game_run` and the `INITIALIZING` session.
+2. **Transaction B:** the whole world and its enemies.
+3. **No transaction:** the introduction.
+4. **Transaction C:** compare-and-set to `ACTIVE`.
+
+A retry with the same creation key and token resumes from the first missing step. The same key with a different token is refused.
+
+### Turn Phases
+
+Each turn request is a `run_turn` row keyed by `(run_id, Idempotency-Key)`, with a hash of the input and state version.
+1. **Claim.**
+   - A known key replays its stored answer, finalises its committed mechanics, or takes over an expired lease.
+   - A new key first finalises another key's committed turn, or clears another key's abandoned (expired) interpretation.
+   - It then checks the run status, the state version (a mismatch is stored as `STALE`) and the per-run turn limit.
+   - Finally it inserts `INTERPRETING` with a lease owner and expiry. A partial unique index allows **at most one unfinished turn per run**.
+2. **Interpret,** with no transaction open.
+   - Deterministic rejections are stored as `REJECTED`, fenced on the lease owner.
+   - A transient AI failure deletes the row, so the key can be retried.
+   - While an attack is pending, an intent that does not open with a DEFEND against it is `DEFENSE_REQUIRED`.
+3. **Mechanics,** in one transaction that holds `SELECT ... FOR UPDATE` on `run_session`:
+   - Fencing: the turn must still be `INTERPRETING` with this lease owner.
+   - The state version must be unchanged.
+   - Resolve with `TurnRandom.player(runSeed, turn)`.
+   - Enforce `DefenseGate`: if the defense did not resolve, roll back.
+   - Apply effects through `EffectApplier`.
+   - Travel through `ExitTraversal`.
+   - Decide terminal status.
+   - Run the enemy phase.
+   - Advance `state_version` and `turn_number`.
+   - Store `MECHANICS_COMMITTED` with the `mechanics_summary`.
+4. **Finalise** (`NarrationFinalizer`).
+   - Claim a narration lease by compare-and-set; a concurrent finaliser gets `REQUEST_IN_PROGRESS`.
+   - Narrate with no transaction open.
+   - In a short transaction fenced on the narration owner, store the attack narration and the response, and mark the turn `COMPLETED`.
+
+   A failure while narrating releases the narration lease; a hard crash relies on its expiry. The mechanics stay committed either way, and the next request (same key or any new key) finalises from the stored summary without resolving or applying anything again.
+
+### Idempotency and Replay
+
+- Stored answers (`COMPLETED`, `REJECTED`, `STALE`) are replayed byte-for-byte: `run_turn.response` is stored as text.
+- Replays never call a model and never count against limits.
+- A transient AI failure leaves no record.
+- Seeds per turn are fixed, so a retry can never reroll.
+
+### Read Path
+
+`GET /runs/{runId}` builds the view inside a read-only transaction from the same `InterpretationSetup` the interpreter would receive, so the view, slash commands and the interpreter share one alias scheme and one visibility filter. It never calls AI and never writes. While a turn's narration is pending, `finalizing` is true and `lastTurn.narration` is null. A pending attack always carries its stored Java `cueText`.
+
+### API and Errors
+
+| Method | Path | Auth |
+|---|---|---|
+| `POST` | `/api/v1/runs` | `X-Invite-Code`, `Idempotency-Key`, client token |
+| `GET` | `/api/v1/runs/{runId}` | Bearer token |
+| `POST` | `/api/v1/runs/{runId}/turns` | Bearer token and `Idempotency-Key`; body `{input, stateVersion}` |
+
+**Run tokens:**
+- they are client-generated, 32 bytes as unpadded base64url (43 characters);
+- they are stored only as SHA-256;
+- they are never issued, echoed, logged or rotated.
+
+`RunTokenInterceptor` checks every run path, and a token for another run is `404`.
+
+Errors are `{"error": {code, message, reason?, hint?}}`:
+
+| Status | Codes |
+|---|---|
+| 400 | `INVALID_REQUEST` |
+| 401 | `UNAUTHORIZED` |
+| 404 | `RUN_NOT_FOUND` |
+| 409 | `STALE_VIEW`, `REQUEST_IN_PROGRESS`, `IDEMPOTENCY_KEY_REUSED`, `TOKEN_IN_USE`, `RUN_FINISHED`, `RUN_INITIALIZING` |
+| 422 | `ACTION_NOT_SUPPORTED`, `INTERPRETATION_FAILED` (reason `AI_UNAVAILABLE` or `INVALID_OUTPUT`), `INVALID_COMMAND`, `DEFENSE_REQUIRED`, `DEFENSE_NOT_RESOLVED` |
+| 429 | `RATE_LIMITED` |
+| 500 | `INTERNAL_ERROR` |
+| 503 | `SERVICE_UNAVAILABLE` |
+
+There are no stack traces or provider text in any error.
+
+### Abuse Limits
+
+The limits are kept in memory (they reset on restart) and are configurable under `game.api.limits.*`:
+- invalid invites: 10 per hour per remote address and 30 per hour globally;
+- new runs: 5 per hour per invite and 20 per day;
+- new turns: 12 per minute per run;
+- AI provider calls: 500 per UTC day (`BudgetedAiProvider`).
+
+Client identity is only the socket address; `X-Forwarded-For` and similar headers are never trusted. Request bodies are capped at 8 KB and turn input at 500 characters.
+
+### Current Tables (V6)
+
+- `run_session`:
+  - status, SHA-256 token hash (unique), creation key (unique), `state_version`, `turn_number`;
+  - the round-robin enemy cursor: the last actor's scene and entity.
+- `pending_attack`:
+  - at most one per run, holding every `IncomingAttack` field, the option and weapon codes and the creating turn;
+  - the mandatory `cue_text` (`NOT NULL`);
+  - the finalised narration (nullable).
+- `run_turn`:
+  - one row per turn request: request hash, base version, status, lease and narration-lease owners and expiries;
+  - turn number, the acting enemy and its choice;
+  - `mechanics_summary` (JSONB, required once mechanics commit) and the exact response (text);
+  - `UNIQUE (run_id, turn_number)`, and a partial unique index allowing one unfinished turn per run.

@@ -78,6 +78,51 @@ class ActionInterpreterTest {
 		assertThat(repair.substring(repair.indexOf("\"problems\""))).doesNotContain("aisle", "acolyte_1", "pew_1");
 	}
 
+	/** The reported smoke-test failure: a named target marked UNSPECIFIED. */
+	static final String UNSPECIFIED_TARGET = document(attack(target("ENTITY", "entity_1", null, "UNSPECIFIED")));
+
+	@Test
+	void unspecifiedNamedTargetIsRepairedWithPreciseGuidance() {
+		FakeAiProvider provider = FakeAiProvider.answering(UNSPECIFIED_TARGET, VALID);
+		ActionInterpretationResult result = interpreter(provider).interpret("I slash at the acolyte with my sword", setup);
+
+		assertThat(result).isInstanceOfSatisfying(Interpreted.class, i -> {
+			assertThat(i.source()).isEqualTo(Source.AI_REPAIRED);
+			assertThat(i.validated().intent().steps().getFirst().payload()).isInstanceOfSatisfying(
+					com.leeburke.springgame.action.ActionPayload.AttackPayload.class,
+					attack -> assertThat(attack.target().specificity())
+							.isEqualTo(com.leeburke.springgame.action.TargetSpecificity.EXPLICIT));
+		});
+		String repair = provider.structuredRequests().get(1).inputJson();
+		String problems = repair.substring(repair.indexOf("\"problems\""));
+		assertThat(problems).contains("steps[0].attack.target", "EXPLICIT (the player named it)",
+				"INFERRED (you identified it from context)", "UNSPECIFIED is only for kind NONE");
+		assertThat(problems).doesNotContain("acolyte_1", "com.leeburke", "Cannot construct");
+	}
+
+	@Test
+	void repeatedUnspecifiedNamedTargetFailsWithTheSameGuidance() {
+		FakeAiProvider provider = FakeAiProvider.answering(UNSPECIFIED_TARGET, UNSPECIFIED_TARGET);
+		ActionInterpretationResult result = interpreter(provider).interpret("I slash at the acolyte with my sword", setup);
+
+		assertThat(result).isInstanceOfSatisfying(Failed.class, failed -> {
+			assertThat(failed.reason()).isEqualTo(Failure.INVALID_OUTPUT);
+			assertThat(failed.details()).singleElement().asString().contains("steps[0].attack.target",
+					"UNSPECIFIED is only for kind NONE");
+		});
+		assertThat(provider.calls()).isEqualTo(2);
+	}
+
+	@Test
+	void promptAndSchemaExplainTargetSpecificity() {
+		String prompt = new com.leeburke.springgame.ai.PromptLibrary().instructions(AiRole.ACTION_INTERPRETER);
+		assertThat(prompt).contains("UNSPECIFIED is only ever used with kind NONE",
+				"{\"kind\": \"ENTITY\", \"alias\": \"entity_1\", \"bodyPart\": null, \"specificity\": \"EXPLICIT\"}",
+				"correct exactly the listed problems");
+		assertThat(ActionDocumentSchema.json()).contains("UNSPECIFIED is only for kind NONE",
+				"Every kind except NONE must be EXPLICIT or INFERRED");
+	}
+
 	@Test
 	void repairReusesTheSameContext() {
 		FakeAiProvider provider = FakeAiProvider.answering("nonsense", VALID);

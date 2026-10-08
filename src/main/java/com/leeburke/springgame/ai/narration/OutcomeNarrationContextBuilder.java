@@ -13,6 +13,7 @@ import com.leeburke.springgame.action.ActionType;
 import com.leeburke.springgame.action.CarriedKind;
 import com.leeburke.springgame.action.CarriedReference;
 import com.leeburke.springgame.action.resolution.IncomingAttack;
+import com.leeburke.springgame.action.resolution.OutcomeEffect;
 import com.leeburke.springgame.action.resolution.ResolvedOutcome;
 import com.leeburke.springgame.action.resolution.StepOutcome;
 import com.leeburke.springgame.action.resolution.StepResult;
@@ -52,6 +53,15 @@ public final class OutcomeNarrationContextBuilder {
 	public OutcomeNarrationContext build(ResolvedOutcome outcome, ValidatedActionIntent validated,
 			Map<String, IncomingAttack> incoming, NarrationMode mode, Optional<TerminalFact> terminal,
 			Optional<String> playerWording) {
+		return build(outcome, validated, incoming, mode, terminal, playerWording, Optional.empty());
+	}
+
+	/**
+	 * @param arrival where the player arrived if the outcome left the scene, as names the player now sees
+	 */
+	public OutcomeNarrationContext build(ResolvedOutcome outcome, ValidatedActionIntent validated,
+			Map<String, IncomingAttack> incoming, NarrationMode mode, Optional<TerminalFact> terminal,
+			Optional<String> playerWording, Optional<Arrival> arrival) {
 		List<ActionStep> steps = validated.intent().steps();
 		if (steps.size() != outcome.steps().size()) {
 			throw new IllegalArgumentException("The outcome has " + outcome.steps().size() + " steps, the intent " + steps.size());
@@ -68,7 +78,7 @@ public final class OutcomeNarrationContextBuilder {
 			if (step.status() != StepStatus.RESOLVED) {
 				attempt = attempt.withoutWords();
 			}
-			facts.add(fact(i + 1, step, attempt, names, incoming));
+			facts.add(fact(i + 1, step, attempt, names, incoming, arrival, validated.context().view().currentZoneId()));
 		}
 		String zone = names.zone(validated.context().view().currentZoneId()).orElseThrow();
 		return new OutcomeNarrationContext(mode, zone, outcome.overall(), facts, terminal,
@@ -76,7 +86,7 @@ public final class OutcomeNarrationContextBuilder {
 	}
 
 	private NarrationFact fact(int step, StepOutcome outcome, AttemptedAction attempt, NarrationNames names,
-			Map<String, IncomingAttack> incoming) {
+			Map<String, IncomingAttack> incoming, Optional<Arrival> arrival, String currentZoneId) {
 		return switch (outcome.status()) {
 			case CANCELLED -> new NarrationFact.StepCancelled(step, attempt, outcome.cancellation().orElseThrow());
 			case MECHANICS_UNAVAILABLE -> new NarrationFact.StepHadNoEffect(step, attempt, outcome.unavailable().orElseThrow());
@@ -94,6 +104,13 @@ public final class OutcomeNarrationContextBuilder {
 						? new NarrationFact.PlayerMoved(step, attempt, zoneName(names, m.fromZone()), zoneName(names, m.toZone()))
 						: new NarrationFact.PlayerStayed(step, attempt, zoneName(names, m.fromZone()),
 								m.toZone().equals(m.fromZone()) ? Optional.empty() : Optional.of(zoneName(names, m.toZone())));
+				case StepResult.ExitResult x -> outcome.effects().stream().anyMatch(OutcomeEffect.LeftScene.class::isInstance)
+						? new NarrationFact.PlayerLeftScene(step, attempt,
+								arrival.orElseThrow(() -> new IllegalArgumentException("A scene was left without an arrival"))
+										.sceneName(),
+								arrival.get().zoneName())
+						: new NarrationFact.ExitNotReached(step, attempt,
+								zoneName(names, currentZoneId));
 				case StepResult.CommunicationResult c -> new NarrationFact.PlayerSpoke(step, attempt, c.kind(),
 						c.addresseeEntityId().map(id -> names.entity(id).orElse(UNSEEN)));
 			};
@@ -101,6 +118,14 @@ public final class OutcomeNarrationContextBuilder {
 	}
 
 	/** What the payload tried to do, in visible names. Spoken words are included here and removed for unresolved steps. */
+	/** Where the player arrived after leaving a scene, as names the player now sees. */
+	public record Arrival(String sceneName, String zoneName) {
+		public Arrival {
+			Objects.requireNonNull(sceneName, "sceneName");
+			Objects.requireNonNull(zoneName, "zoneName");
+		}
+	}
+
 	static AttemptedAction attempt(ActionPayload payload, NarrationNames names, PlayerActionReferences references) {
 		Builder a = new Builder(payload.type());
 		switch (payload) {

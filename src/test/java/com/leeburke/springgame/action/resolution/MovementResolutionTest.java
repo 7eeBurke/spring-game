@@ -78,8 +78,6 @@ class MovementResolutionTest {
 	@Test
 	void unsupportedMovementIsUnavailable() {
 		MovePayload[] unsupported = {
-				new MovePayload(MovementType.ADVANCE, new ActionTarget.ExitTarget("north_door", TargetSpecificity.EXPLICIT),
-						RelativeGoal.NONE, ActionApproach.NORMAL),
 				new MovePayload(MovementType.CLOSE_DISTANCE, acolyte(), RelativeGoal.NONE, ActionApproach.NORMAL),
 				new MovePayload(MovementType.RETREAT, ActionTarget.unspecified(), RelativeGoal.NONE, ActionApproach.NORMAL),
 				new MovePayload(MovementType.REPOSITION, ActionTarget.unspecified(), RelativeGoal.COVER, ActionApproach.NORMAL),

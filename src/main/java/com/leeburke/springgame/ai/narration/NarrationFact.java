@@ -3,6 +3,7 @@ package com.leeburke.springgame.ai.narration;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.leeburke.springgame.action.ActionType;
 import com.leeburke.springgame.action.CommunicationKind;
@@ -23,6 +24,16 @@ import com.leeburke.springgame.mechanics.ImpactSeverity;
  * @see OutcomeNarrationContextBuilder
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.SIMPLE_NAME, property = "fact")
+@JsonSubTypes({
+		@JsonSubTypes.Type(NarrationFact.PlayerAttacked.class),
+		@JsonSubTypes.Type(NarrationFact.PlayerDefended.class),
+		@JsonSubTypes.Type(NarrationFact.PlayerMoved.class),
+		@JsonSubTypes.Type(NarrationFact.PlayerStayed.class),
+		@JsonSubTypes.Type(NarrationFact.PlayerLeftScene.class),
+		@JsonSubTypes.Type(NarrationFact.ExitNotReached.class),
+		@JsonSubTypes.Type(NarrationFact.PlayerSpoke.class),
+		@JsonSubTypes.Type(NarrationFact.StepCancelled.class),
+		@JsonSubTypes.Type(NarrationFact.StepHadNoEffect.class) })
 public sealed interface NarrationFact {
 
 	/** 1-based step the fact belongs to. */
@@ -92,6 +103,24 @@ public sealed interface NarrationFact {
 			Objects.requireNonNull(attempt, "attempt");
 			Objects.requireNonNull(zone, "zone");
 			Objects.requireNonNull(attemptedZone, "attemptedZone");
+		}
+	}
+
+	/** The player went through an exit and arrived in another scene, both named as the player now sees them. */
+	record PlayerLeftScene(int step, AttemptedAction attempt, String destinationScene, String arrivalZone)
+			implements NarrationFact {
+		public PlayerLeftScene {
+			Objects.requireNonNull(attempt, "attempt");
+			Objects.requireNonNull(destinationScene, "destinationScene");
+			Objects.requireNonNull(arrivalZone, "arrivalZone");
+		}
+	}
+
+	/** The player tried to leave through an exit that is not in their zone; they did not move. */
+	record ExitNotReached(int step, AttemptedAction attempt, String zone) implements NarrationFact {
+		public ExitNotReached {
+			Objects.requireNonNull(attempt, "attempt");
+			Objects.requireNonNull(zone, "zone");
 		}
 	}
 

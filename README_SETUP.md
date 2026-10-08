@@ -76,6 +76,54 @@ The datasource defaults are in `src/main/resources/application.properties`. Over
 
 Do not commit real credentials.
 
+## Play Through the API
+
+The game is played through a small REST API. Run creation needs an invite code. With none configured, creation is closed.
+
+```powershell
+$env:GAME_INVITE_CODES = "local-invite"      # comma-separated; never commit real codes
+.\mvnw.cmd spring-boot:run
+```
+
+**Client-generated tokens.** The client generates its own secret run token before creating a run: 32 random bytes as unpadded base64url, exactly 43 characters. The server stores only its SHA-256 hash, never returns it and never rotates it. Keep the token: losing it means losing access to the run.
+
+Every state-changing request carries an `Idempotency-Key` UUID. Retrying with the same key replays the stored answer and never applies anything twice.
+
+```bash
+TOKEN=$(openssl rand 32 | basenc --base64url | tr -d '=')
+# Create (or resume creating) a run
+curl -s -X POST localhost:8080/api/v1/runs -H "X-Invite-Code: local-invite" \
+  -H "Idempotency-Key: $(uuidgen)" -H "Authorization: Bearer $TOKEN"
+# Read the current view (never calls AI, never writes)
+curl -s localhost:8080/api/v1/runs/$RUN -H "Authorization: Bearer $TOKEN"
+# Take a turn on the view's stateVersion (free text needs AI; slash commands always work)
+curl -s -X POST localhost:8080/api/v1/runs/$RUN/turns -H "Authorization: Bearer $TOKEN" \
+  -H "Idempotency-Key: $(uuidgen)" -H "Content-Type: application/json" \
+  -d '{"input": "/hold", "stateVersion": 0}'
+```
+
+Slash commands are listed in `docs/AI_CONTRACTS.md`, for example:
+- `/attack entity_1 slash with weapon_1`;
+- `/defend parry`;
+- `/move zone_2`;
+- `/move exit_1`.
+
+When the view says `"awaiting": "DEFENSE"`, the next turn must begin with a defense.
+
+API settings, with defaults:
+
+| Variable / property | Default |
+|---|---|
+| `GAME_INVITE_CODES` | empty (creation closed) |
+| `GAME_CORS_ORIGINS` | empty (CORS off) |
+| `GAME_AI_DAILY_CALL_LIMIT` | `500` provider calls per UTC day |
+| `game.api.limits.turns-per-minute-per-run` | `12` |
+| `game.api.limits.creations-per-hour-per-invite` / `creations-per-day` | `5` / `20` |
+| `game.api.limits.invalid-invites-per-hour-per-address` / `invalid-invites-per-hour` | `10` / `30` |
+| `game.api.lease` | `2m` |
+
+Limits are kept in memory and reset on restart. Only the socket address identifies a client; forwarding headers are ignored. Behind a local proxy, all clients therefore share one address, and the global limits are the real protection.
+
 ## Optional: AI
 
 The game runs fully without AI. AI is **off by default**, and every AI role then uses its deterministic fallback. Actions use slash commands such as `/attack entity_1 slash` (see `docs/AI_CONTRACTS.md`), and narration uses factual templates. The tests never call a real model and need no key.

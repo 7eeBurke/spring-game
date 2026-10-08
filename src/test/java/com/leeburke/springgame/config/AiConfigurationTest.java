@@ -20,7 +20,7 @@ class AiConfigurationTest {
 	private static final AiProperties.Roles DEFAULT_ROLES = new AiProperties.Roles(NO_OVERRIDE, NO_OVERRIDE, NO_OVERRIDE, NO_OVERRIDE);
 
 	private static AiProperties properties(boolean enabled, String model, String key) {
-		return new AiProperties(enabled, model, Duration.ofSeconds(20), 1, new AiProperties.OpenAi(key, ""), DEFAULT_ROLES);
+		return new AiProperties(enabled, model, Duration.ofSeconds(20), 1, new AiProperties.OpenAi(key, ""), DEFAULT_ROLES, 500);
 	}
 
 	@Test
@@ -49,7 +49,7 @@ class AiConfigurationTest {
 		AiProperties.Roles roles = new AiProperties.Roles(new AiProperties.Role("small-model", 900, 0.0), NO_OVERRIDE, NO_OVERRIDE,
 				new AiProperties.Role(null, null, 0.9));
 		AiProperties properties = new AiProperties(true, "main-model", Duration.ofSeconds(9), 1, new AiProperties.OpenAi("k", ""),
-				roles);
+				roles, 500);
 
 		var settings = AiConfiguration.roleSettings(properties);
 		assertThat(settings.forRole(AiRole.ACTION_INTERPRETER))

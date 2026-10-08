@@ -495,3 +495,67 @@ Bundled base weights:
 | Warden | overhead smash 45, heavy smash 35, haft hook 20, hold 0 |
 | Penitent | ember bolt 70, rod strike 20, hold 10 + 10 (CAUTIOUS) = 20 |
 | Guardian | sweeping cut 40, overhead cleave 35, lunge 25, hold 0 |
+
+## Turn Effects and the Encounter (Stage 14)
+
+### Applying outcomes
+
+`EffectApplier` turns the confirmed `ResolvedOutcome` effects into state. It never reads the player's text. Effects are applied exactly once, in the turn's locked mechanics transaction.
+- **Enemy and player damage:** HP is reduced by the final damage and clamped at 0.
+- **Impact severity** is reported to narration, but **never changes body-part severity**. Injury escalation, conditions, healing, loot and XP are deferred.
+- **Moves** change the zone within the scene.
+- **Leaving through an exit** moves the player to the destination scene, which is then marked discovered.
+
+### Fallen enemies
+
+- An enemy at 0 HP is **FALLEN**: it stays visible (creature condition `FALLEN`) but has no combat profile and never acts.
+- An attack on it, including a later step on a target felled earlier in the same intent, is cancelled with `TARGET_DEFEATED` and no roll.
+- It leaves no loot or objects.
+
+### Enemy turns
+
+**When an enemy acts.** At most one enemy acts after a committed turn, and only if all of these hold:
+- the run is still ACTIVE;
+- the player did not leave the scene;
+- no attack is pending;
+- the turn has at least one RESOLVED step that is **not DEFEND**.
+
+So a defense-only turn never provokes another attack, while "defend, then counterattack" does. A turn in which nothing resolved lets no enemy act.
+
+**Which enemy acts.** The actor is chosen round-robin among living, visible enemies of the current scene, in entity-ID order:
+- it is the next one after the persisted cursor, wrapping around;
+- a cursor from another scene resets to the first;
+- HOLD advances the cursor like an attack.
+
+The decision uses `EnemyBehavior` with the actor's two most recent choices and the turn's enemy random stream.
+
+**When it attacks.** The attack is persisted as the run's pending attack together with its Java cue (`Incoming: ...`). It is never rerolled or re-telegraphed on reload.
+
+### Mandatory defense
+
+While an attack is pending:
+- the turn's first step must be a DEFEND responding to it (`DEFENSE_REQUIRED` otherwise);
+- that DEFEND must actually reach RESOLVED (`DEFENSE_NOT_RESOLVED` otherwise, and nothing from the turn is committed);
+- a failed defense check is still RESOLVED: its damage applies and the attack is consumed;
+- follow-up steps are allowed;
+- there is no option to ignore an attack.
+
+A rejected or stale request consumes no turn.
+
+### Exits
+
+- `ADVANCE` through a known exit in the player's current zone automatically succeeds and leaves the scene; from another zone it fails.
+- Steps after leaving are cancelled with `LEFT_SCENE`.
+- The player arrives in the destination's zone that holds its exit back to the origin.
+- Enemies do not follow, and no enemy acts on the arrival turn.
+
+### End of a run
+
+- **DEAD:** the player's HP reaches 0.
+- **VICTORIOUS:** the Chapel Guardian reaches 0 HP while the player lives.
+- If both happen in one turn, death takes precedence.
+- No reward is granted, and a finished run accepts no further turns.
+
+### Turn randomness
+
+Each turn draws from fixed streams derived from the run seed: domain 20 for the player's checks and domain 21 for the enemy's decision, both indexed by turn number. The character uses domain 10. The run seed comes from `SecureRandom` and is never exposed.

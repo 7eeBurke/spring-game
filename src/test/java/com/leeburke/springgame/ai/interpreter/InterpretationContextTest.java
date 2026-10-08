@@ -27,7 +27,8 @@ class InterpretationContextTest {
 
 		assertThat(context.currentZone()).isEqualTo("zone_2");
 		assertThat(context.zones()).containsExactly(new Zone("zone_1", "Side Aisle"), new Zone("zone_2", "Nave Entrance"));
-		assertThat(context.entities()).containsExactly(new Thing("entity_1", "Hollow Acolyte", "zone_1"));
+		assertThat(context.entities()).containsExactly(new ActionInterpretationContext.Creature("entity_1", "Hollow Acolyte", "zone_1",
+				ActionInterpretationContext.Condition.ACTIVE));
 		assertThat(context.objects()).containsExactly(new Thing("object_1", "Wooden Pew", "zone_2"));
 		assertThat(context.hazards()).containsExactly(new Thing("hazard_1", "Fire", "zone_1"));
 		assertThat(context.weapons()).containsExactly(new Owned("weapon_1", "Longsword"));

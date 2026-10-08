@@ -1,7 +1,9 @@
 package com.leeburke.springgame.action.resolution;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -55,11 +57,17 @@ public final class ActionEngine {
 		String currentZone = context.location().zoneId();
 		int remainingHp = context.player().currentHp();
 		boolean playerDown = remainingHp == 0;
+		boolean leftScene = false;
+		Map<String, Integer> targetHp = new HashMap<>(context.targetHitPoints());
 
 		for (ActionStep step : intent.steps()) {
 			StepOutcome outcome;
 			if (playerDown) {
 				outcome = StepOutcome.cancelled(step.id(), step.actionType(), CancellationReason.PLAYER_DOWN);
+			} else if (leftScene) {
+				outcome = StepOutcome.cancelled(step.id(), step.actionType(), CancellationReason.LEFT_SCENE);
+			} else if (targetsFallen(step, targetHp)) {
+				outcome = StepOutcome.cancelled(step.id(), step.actionType(), CancellationReason.TARGET_DEFEATED);
 			} else if (step.relation() == StepRelation.WHILE) {
 				outcome = StepOutcome.unavailable(step.id(), step.actionType(), UnavailableReason.SIMULTANEOUS_ACTION);
 			} else if (step.relation() == StepRelation.IF_PREVIOUS_SUCCEEDS && !outcomes.getLast().succeeded()) {
@@ -76,9 +84,9 @@ public final class ActionEngine {
 						remainingHp -= Math.min(remainingHp, damaged.hpDamage());
 						playerDown = remainingHp == 0;
 					}
-					case OutcomeEffect.TargetDamaged damaged -> {
-						// Applied to the target by the enemy model, outside resolution.
-					}
+					case OutcomeEffect.TargetDamaged damaged -> targetHp.computeIfPresent(damaged.entityId(),
+							(id, hp) -> hp - Math.min(hp, damaged.hpDamage()));
+					case OutcomeEffect.LeftScene left -> leftScene = true;
 				}
 			}
 		}
@@ -104,6 +112,17 @@ public final class ActionEngine {
 			case ActionPayload.UseAbilityPayload p -> notImplemented(step);
 			case ActionPayload.UseItemPayload p -> notImplemented(step);
 		};
+	}
+
+	/**
+	 * True when the step attacks an entity that an earlier step in this intent brought to 0 HP. Only
+	 * entities with known HP are tracked; damage is applied to state outside resolution.
+	 */
+	private static boolean targetsFallen(ActionStep step, Map<String, Integer> targetHp) {
+		return step.payload() instanceof ActionPayload.AttackPayload attack
+				&& attack.target() instanceof ActionTarget.EntityTarget entity
+				&& targetHp.containsKey(entity.entityId())
+				&& targetHp.get(entity.entityId()) == 0;
 	}
 
 	private static Optional<String> addressee(ActionTarget target) {

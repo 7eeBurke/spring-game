@@ -55,6 +55,26 @@ public class GameRunStore {
 	}
 
 	/**
+	 * Sets the player's current HP, the only character state a turn changes in Stage 14. Joins the
+	 * caller's transaction.
+	 *
+	 * @throws IllegalArgumentException if the HP is outside 0 to the character's max HP
+	 * @throws PersistedStateException  if the run has no character
+	 */
+	@Transactional
+	public void updatePlayerHp(UUID runId, int currentHp) {
+		Objects.requireNonNull(runId, "runId");
+		PlayerCharacterEntity character = entityManager.find(PlayerCharacterEntity.class, runId);
+		if (character == null) {
+			throw new PersistedStateException("Run " + runId + " has no player character");
+		}
+		if (currentHp < 0 || currentHp > character.getMaxHp()) {
+			throw new IllegalArgumentException("Player HP must be between 0 and " + character.getMaxHp());
+		}
+		character.setCurrentHp(currentHp);
+	}
+
+	/**
 	 * Loads a run. Empty only when no run with this ID exists.
 	 *
 	 * @throws PersistedStateException if the run exists but its stored state is missing or invalid

@@ -123,6 +123,10 @@ public class EnemyInstanceEntity {
 		return currentHp;
 	}
 
+	void setCurrentHp(int currentHp) {
+		this.currentHp = currentHp;
+	}
+
 	String getWeaponCode() {
 		return weaponCode;
 	}

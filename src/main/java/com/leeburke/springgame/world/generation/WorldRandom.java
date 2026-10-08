@@ -38,7 +38,11 @@ public final class WorldRandom {
 		return z ^ (z >>> 31);
 	}
 
-	static long derive(long parent, long domain, long index) {
+	/**
+	 * Derives an independent child seed. Public so gameplay can derive per-turn streams from the run
+	 * seed with its own domains; domains 1-3 belong to world generation.
+	 */
+	public static long derive(long parent, long domain, long index) {
 		return mix64(parent ^ mix64(domain + index * GOLDEN_GAMMA));
 	}
 

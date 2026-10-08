@@ -153,13 +153,14 @@ final class ResolutionFixtures {
 		Map<TargetProfileKey, TargetCombatProfile> profiles = new HashMap<>(
 				Map.of(TargetProfileKey.wholeTarget(ACOLYTE), ACOLYTE_PROFILE));
 		Map<String, IncomingAttack> attacks = new HashMap<>(Map.of(ATTACK, INCOMING));
+		Map<String, Integer> hitPoints = new HashMap<>();
 
 		ActionValidationContext validationContext() {
 			return new ActionValidationContext(view, references(), attacks.keySet());
 		}
 
 		ActionResolutionContext resolutionContext() {
-			return new ActionResolutionContext(player, scene, location, references(), profiles, attacks);
+			return new ActionResolutionContext(player, scene, location, references(), profiles, attacks, hitPoints);
 		}
 
 		ValidatedActionIntent validate(ActionIntent intent) {

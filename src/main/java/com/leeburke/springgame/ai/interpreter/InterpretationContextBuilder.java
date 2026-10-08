@@ -15,7 +15,9 @@ import com.leeburke.springgame.action.resolution.IncomingAttack;
 import com.leeburke.springgame.action.validation.ActionValidationContext;
 import com.leeburke.springgame.action.validation.PlayerActionReferences;
 import com.leeburke.springgame.ai.interpreter.ActionInterpretationContext.BodyPartState;
+import com.leeburke.springgame.ai.interpreter.ActionInterpretationContext.Condition;
 import com.leeburke.springgame.ai.interpreter.ActionInterpretationContext.Connection;
+import com.leeburke.springgame.ai.interpreter.ActionInterpretationContext.Creature;
 import com.leeburke.springgame.ai.interpreter.ActionInterpretationContext.Exit;
 import com.leeburke.springgame.ai.interpreter.ActionInterpretationContext.IncomingAttackSummary;
 import com.leeburke.springgame.ai.interpreter.ActionInterpretationContext.Owned;
@@ -49,8 +51,16 @@ public final class InterpretationContextBuilder {
 		this.world = Objects.requireNonNull(world, "world");
 	}
 
+	/** Every visible creature is ACTIVE. */
 	public InterpretationSetup build(PlayerSceneView view, PlayerCharacterState player, List<IncomingAttack> incoming) {
+		return build(view, player, incoming, Set.of());
+	}
+
+	/** @param fallenEntityIds visible creatures at 0 HP, shown as FALLEN */
+	public InterpretationSetup build(PlayerSceneView view, PlayerCharacterState player, List<IncomingAttack> incoming,
+			Set<String> fallenEntityIds) {
 		Objects.requireNonNull(view, "view");
+		Objects.requireNonNull(fallenEntityIds, "fallenEntityIds");
 		Objects.requireNonNull(player, "player");
 		Objects.requireNonNull(incoming, "incoming");
 		AliasTable.Builder aliases = AliasTable.builder();
@@ -64,8 +74,10 @@ public final class InterpretationContextBuilder {
 				.toList();
 
 		Map<String, String> entityAliases = mint(aliases, AliasKind.ENTITY, view.entities(), PlayerSceneView.VisibleEntity::id);
-		List<Thing> entities = sorted(view.entities(), PlayerSceneView.VisibleEntity::id).stream()
-				.map(e -> new Thing(entityAliases.get(e.id()), name(e.definitionCode()), zoneAliases.get(e.zoneId()))).toList();
+		List<Creature> entities = sorted(view.entities(), PlayerSceneView.VisibleEntity::id).stream()
+				.map(e -> new Creature(entityAliases.get(e.id()), name(e.definitionCode()), zoneAliases.get(e.zoneId()),
+						fallenEntityIds.contains(e.id()) ? Condition.FALLEN : Condition.ACTIVE))
+				.toList();
 		Map<String, String> objectAliases = mint(aliases, AliasKind.OBJECT, view.objects(), PlayerSceneView.VisibleObject::id);
 		List<Thing> objects = sorted(view.objects(), PlayerSceneView.VisibleObject::id).stream()
 				.map(o -> new Thing(objectAliases.get(o.id()), name(o.definitionCode()), zoneAliases.get(o.zoneId()))).toList();

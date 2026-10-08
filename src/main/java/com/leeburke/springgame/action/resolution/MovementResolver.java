@@ -25,6 +25,10 @@ final class MovementResolver {
 		if (move.movementType() == MovementType.HOLD_POSITION) {
 			return resolved(step, StepSuccess.SUCCESS, new StepResult.MovementResult(currentZone, currentZone, false), List.of());
 		}
+		if (move.movementType() == MovementType.ADVANCE && move.goal() == RelativeGoal.NONE
+				&& move.target() instanceof ActionTarget.ExitTarget exit) {
+			return throughExit(step, exit.exitId(), scene, currentZone);
+		}
 		boolean zoneMove = (move.movementType() == MovementType.REPOSITION || move.movementType() == MovementType.ADVANCE)
 				&& move.goal() == RelativeGoal.NONE
 				&& move.target() instanceof ActionTarget.ZoneTarget;
@@ -40,6 +44,19 @@ final class MovementResolver {
 		}
 		return resolved(step, StepSuccess.SUCCESS, new StepResult.MovementResult(currentZone, destination, true),
 				List.of(new OutcomeEffect.PlayerMoved(currentZone, destination)));
+	}
+
+	/**
+	 * Leaving through a known exit: automatic success from the exit's own zone, automatic failure from
+	 * anywhere else (the player must first move to it). The destination is not resolution's concern.
+	 */
+	private static StepOutcome throughExit(ActionStep step, String exitId, SceneState scene, String currentZone) {
+		boolean here = scene.exits().stream().anyMatch(x -> x.id().equals(exitId) && x.zoneId().equals(currentZone))
+				&& !scene.isHidden(HiddenContentKind.EXIT, exitId);
+		if (!here) {
+			return resolved(step, StepSuccess.FAILURE, new StepResult.ExitResult(exitId), List.of());
+		}
+		return resolved(step, StepSuccess.SUCCESS, new StepResult.ExitResult(exitId), List.of(new OutcomeEffect.LeftScene(exitId)));
 	}
 
 	private static boolean knownConnection(SceneState scene, String a, String b) {

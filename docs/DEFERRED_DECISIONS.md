@@ -45,9 +45,9 @@ Enemy stats, HP, defense DC, attack difficulty, anatomy for the four MVP enemies
 - Body-part requirements of enemy attacks (for example a destroyed arm preventing a swing).
 - Enemy movement, retreat, cover and defense, and range or positioning as behaviour inputs.
 - What an enemy may observe about the player, and therefore Perception-based exploitation and the `OPPORTUNISTIC` trait (identity only for now).
-- Applying damage to enemies, enemy death and removal.
+- Enemy removal, corpses as objects, and loot. Stage 14 applies HP damage, and an enemy at 0 HP stays as a FALLEN creature.
 - Fated effects on enemies (generation, variants such as the Broken Veteran, behaviour). Fated has no effect on enemies.
-- Persisting enemy decision history; callers currently supply recent choices.
+- Longer enemy decision history. Stage 14 persists each turn's actor and choice in `run_turn` and supplies the last two.
 
 ## Content Mechanics
 
@@ -97,3 +97,17 @@ Decided in Stage 13 (see `AI_CONTRACTS.md`): the AI-facing alias format and how 
 - A second AI provider implementation.
 - Expanding the lore beyond the fixed premise in `content/lore.json`.
 - Narrating the spoken words of `COMMUNICATE` steps (currently only the kind and addressee are narrated).
+
+## Stage 14 Deferrals
+
+- **Body-part severity escalation from impact severity.** Stage 14 applies HP damage only.
+- **An undefended-attack rule.** Defending is currently mandatory while an attack is pending.
+- **Initiative, range and reach.** Attacks have no range check, and enemies do not move.
+- **More than one enemy acting per turn,** and enemies following the player between scenes.
+- **NPC dialogue and social mechanics:** persona, knowledge limits, replies and persuasion. COMMUNICATE is narrated as spoken, with no reaction.
+- **Rewards for victory,** XP and loot.
+- **Persisting abuse-limit and AI-budget counters.** They live in memory and reset on restart.
+- **Retention and pruning of `run_turn` history.**
+- **Hosting,** a reverse proxy or Tailscale Funnel, and trusted client-address handling behind a proxy.
+- **Cross-run generation context.** Run creation passes an empty `GenerationContextSnapshot`.
+- **Accounts,** listing a player's runs, and token recovery. A lost token means a lost run.

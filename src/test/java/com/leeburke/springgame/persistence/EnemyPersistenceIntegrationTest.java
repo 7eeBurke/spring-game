@@ -140,7 +140,9 @@ class EnemyPersistenceIntegrationTest {
 	void staticEnemyContentHasNoTables() {
 		List<String> tables = jdbc.queryForList(
 				"SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'", String.class);
+		// pending_attack (Stage 14) is run state: the one attack a run is waiting to defend against.
 		assertThat(tables).contains("enemy_instance", "enemy_body_part")
+				.filteredOn(t -> !t.equals("pending_attack"))
 				.noneMatch(t -> t.contains("definition") || t.contains("anatomy") || t.contains("trait")
 						|| t.contains("attack") || t.contains("behavio"));
 	}

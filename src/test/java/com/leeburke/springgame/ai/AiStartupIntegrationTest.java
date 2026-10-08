@@ -36,7 +36,8 @@ class AiStartupIntegrationTest {
 				.isInstanceOf(ActionInterpretationResult.Failed.class);
 		for (AiRole role : AiRole.values()) {
 			assertThat(prompts.instructions(role)).isNotBlank();
-			assertThat(prompts.version(role)).isEqualTo(role == AiRole.OUTCOME_NARRATOR ? 2 : 1);
+			assertThat(prompts.version(role)).isEqualTo(
+					role == AiRole.OUTCOME_NARRATOR || role == AiRole.ACTION_INTERPRETER ? 2 : 1);
 		}
 	}
 }

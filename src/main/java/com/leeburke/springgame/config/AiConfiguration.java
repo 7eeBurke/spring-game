@@ -1,5 +1,6 @@
 package com.leeburke.springgame.config;
 
+import java.time.Clock;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Optional;
@@ -15,6 +16,7 @@ import com.leeburke.springgame.ai.AiGenerationSettings;
 import com.leeburke.springgame.ai.AiProvider;
 import com.leeburke.springgame.ai.AiRole;
 import com.leeburke.springgame.ai.AiRoleSettings;
+import com.leeburke.springgame.ai.BudgetedAiProvider;
 import com.leeburke.springgame.ai.DisabledAiProvider;
 import com.leeburke.springgame.ai.PromptLibrary;
 import com.leeburke.springgame.ai.interpreter.ActionInterpreter;
@@ -45,9 +47,14 @@ public class AiConfiguration {
 			AiRole.ENEMY_ATTACK_NARRATOR, 200,
 			AiRole.CHARACTER_INTRODUCTION, 600);
 
+	/**
+	 * The configured provider, wrapped in the global daily budget when it is a real one. Spring
+	 * closes it (and so the HTTP client) on shutdown.
+	 */
 	@Bean
-	AiProvider aiProvider(AiProperties properties) {
-		return provider(properties);
+	AiProvider aiProvider(AiProperties properties, Clock clock) {
+		AiProvider provider = provider(properties);
+		return provider instanceof DisabledAiProvider ? provider : new BudgetedAiProvider(provider, properties.dailyCallLimit(), clock);
 	}
 
 	static AiProvider provider(AiProperties properties) {

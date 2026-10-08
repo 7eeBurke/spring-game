@@ -104,11 +104,23 @@ public record ActionDocument(
 		NONE
 	}
 
-	/** A target. Scene kinds need an alias; SELF and NONE have none. Only ENTITY and SELF may name a body part. */
+	/**
+	 * A target. Scene kinds need an alias; SELF and NONE have none. Only ENTITY and SELF may name a
+	 * body part. Every kind except NONE identifies something, so its specificity is EXPLICIT or
+	 * INFERRED; NONE is always UNSPECIFIED (as in Stage 10, where only "no target" is UNSPECIFIED).
+	 */
 	public record Target(TargetKind kind, String alias, BodyPart bodyPart, TargetSpecificity specificity) {
 		public Target {
 			Objects.requireNonNull(kind, "kind");
 			Objects.requireNonNull(specificity, "specificity");
+			if (kind != TargetKind.NONE && specificity == TargetSpecificity.UNSPECIFIED) {
+				throw new IllegalArgumentException("a " + kind + " target identifies something, so specificity must be "
+						+ "EXPLICIT (the player named it) or INFERRED (you identified it from context); "
+						+ "UNSPECIFIED is only for kind NONE");
+			}
+			if (kind == TargetKind.NONE && specificity != TargetSpecificity.UNSPECIFIED) {
+				throw new IllegalArgumentException("a NONE target identifies nothing, so specificity must be UNSPECIFIED");
+			}
 			boolean scene = kind != TargetKind.SELF && kind != TargetKind.NONE;
 			if (scene != (alias != null)) {
 				throw new IllegalArgumentException(scene ? "a " + kind + " target needs an alias" : "a " + kind + " target has no alias");

@@ -16,8 +16,8 @@ import com.leeburke.springgame.content.enemy.EnemyCatalog;
 import com.leeburke.springgame.enemy.EnemyInstance;
 
 /**
- * Reads persisted enemy state. Enemies are written only by {@link WorldStore#initializeWorld}, with
- * the rest of the world; applying combat effects (and so updating enemies) is deferred.
+ * Reads persisted enemy state and applies confirmed HP changes. Enemies are created only by
+ * {@link WorldStore#initializeWorld}, with the rest of the world, and loaded exactly as stored.
  */
 @Service
 public class EnemyStore {
@@ -41,6 +41,24 @@ public class EnemyStore {
 				.map(mapper::toDomain)
 				.sorted(Comparator.comparing(EnemyInstance::entityId))
 				.toList();
+	}
+
+	/**
+	 * Sets an enemy's current HP; at 0 it is fallen. Joins the caller's transaction (a turn's
+	 * mechanics are applied in one).
+	 *
+	 * @throws IllegalArgumentException if the enemy does not exist or the HP is outside 0 to its max
+	 */
+	@Transactional
+	public void updateHp(UUID sceneId, String entityId, int currentHp) {
+		EnemyInstanceEntity entity = entityManager.find(EnemyInstanceEntity.class, new EnemyInstanceId(sceneId, entityId));
+		if (entity == null) {
+			throw new IllegalArgumentException("No enemy " + entityId + " in scene " + sceneId);
+		}
+		if (currentHp < 0 || currentHp > entity.getMaxHp()) {
+			throw new IllegalArgumentException("Enemy HP must be between 0 and " + entity.getMaxHp());
+		}
+		entity.setCurrentHp(currentHp);
 	}
 
 	@Transactional(readOnly = true)

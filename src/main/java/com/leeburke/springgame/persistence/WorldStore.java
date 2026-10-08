@@ -199,6 +199,16 @@ public class WorldStore {
 		return toDomain(entity);
 	}
 
+	/** Marks a scene as discovered (the player has entered it). Joins the caller's transaction. */
+	@Transactional
+	public void markDiscovered(UUID sceneId) {
+		SceneInstanceEntity scene = entityManager.find(SceneInstanceEntity.class, Objects.requireNonNull(sceneId, "sceneId"));
+		if (scene == null) {
+			throw new IllegalArgumentException("Scene " + sceneId + " does not exist");
+		}
+		scene.markDiscovered();
+	}
+
 	@Transactional(readOnly = true)
 	public Optional<PlayerLocation> findPlayerLocation(UUID runId) {
 		Objects.requireNonNull(runId, "runId");

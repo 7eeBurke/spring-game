@@ -62,6 +62,13 @@ public sealed interface StepResult {
 	}
 
 	/** Something was said. Social consequences are not resolved yet. */
+	/** The player went through a known exit in their current zone, leaving the scene. */
+	record ExitResult(String exitId) implements StepResult {
+		public ExitResult {
+			Refs.require(exitId, "exitId");
+		}
+	}
+
 	record CommunicationResult(CommunicationKind kind, Optional<String> addresseeEntityId) implements StepResult {
 		public CommunicationResult {
 			Objects.requireNonNull(kind, "kind");

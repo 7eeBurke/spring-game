@@ -17,7 +17,7 @@ public final class PromptLibrary {
 
 	/** Current prompt version of each role. Bumped when a prompt's meaning changes. */
 	public static final Map<AiRole, Integer> CURRENT_VERSIONS = Map.of(
-			AiRole.ACTION_INTERPRETER, 1,
+			AiRole.ACTION_INTERPRETER, 2,
 			AiRole.OUTCOME_NARRATOR, 2,
 			AiRole.ENEMY_ATTACK_NARRATOR, 1,
 			AiRole.CHARACTER_INTRODUCTION, 1);

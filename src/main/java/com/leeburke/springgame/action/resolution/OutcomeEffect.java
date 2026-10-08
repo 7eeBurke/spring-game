@@ -46,6 +46,13 @@ public sealed interface OutcomeEffect {
 		}
 	}
 
+	/** The player leaves the scene through this exit. Where it leads is decided outside resolution. */
+	record LeftScene(String exitId) implements OutcomeEffect {
+		public LeftScene {
+			Refs.require(exitId, "exitId");
+		}
+	}
+
 	private static void requireDamage(int hpDamage) {
 		if (hpDamage < 0) {
 			throw new IllegalArgumentException("HP damage cannot be negative, but was " + hpDamage);

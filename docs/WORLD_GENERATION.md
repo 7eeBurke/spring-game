@@ -115,7 +115,7 @@ Scenes are assigned in generation order (route stages, then optional scenes). Fo
 
 ### Across runs
 
-Recent-run history reaches generation only through the snapshot, read once when the world is created. Building the snapshot from a player's past runs is deferred until an account/orchestration layer exists; until then callers pass a snapshot (or an empty one).
+Recent-run history reaches generation only through the snapshot, read once when the world is created. Building the snapshot from a player's past runs is deferred until an account layer exists. Run creation (Stage 14) currently passes an empty snapshot.
 
 ## Scene Contents
 
@@ -223,11 +223,13 @@ Projection rules, given the set of currently visible zones supplied by the calle
 - a connection is shown only if it is not hidden and both its zones are visible;
 - the current zone must exist, must not be hidden and must be among the visible zones.
 
-Determining which zones are visible (line of sight) is deferred. Active events and environment flags are not exposed until rules define how they become perceivable. Combat range and relative positioning belong to combat.
+Determining which zones are visible (line of sight) is deferred. During play (Stage 14), every non-hidden zone of the current scene is treated as visible. Hidden content therefore stays hidden, and everything else in the scene is shown. Active events and environment flags are not exposed until rules define how they become perceivable. Combat range and relative positioning belong to combat.
 
 ### Player Location
 
 The run's current location is a scene and a zone within it. It is world state, not character state. The scene must belong to the same run, and the zone must exist in that scene and must not be hidden.
+
+When the player leaves through an exit (Stage 14), the new location is the destination scene, at the zone of that scene's own exit back to the origin. Generation guarantees exactly one such return exit. The destination is then marked `discovered`. Scene contents are never generated on entry: they already exist from run creation.
 
 ## Enemy State
 

@@ -147,6 +147,10 @@ public class PlayerCharacterEntity {
 		return currentHp;
 	}
 
+	void setCurrentHp(int currentHp) {
+		this.currentHp = currentHp;
+	}
+
 	String getPassiveCode() {
 		return passiveCode;
 	}

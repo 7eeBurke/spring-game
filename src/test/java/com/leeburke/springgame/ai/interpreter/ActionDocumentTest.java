@@ -46,8 +46,12 @@ class ActionDocumentTest {
 	// --- JSON builders ---
 
 	static String target(String kind, String alias, String bodyPart) {
+		return target(kind, alias, bodyPart, kind.equals("NONE") ? "UNSPECIFIED" : "EXPLICIT");
+	}
+
+	static String target(String kind, String alias, String bodyPart, String specificity) {
 		return "{\"kind\":\"" + kind + "\",\"alias\":" + quoted(alias) + ",\"bodyPart\":" + quoted(bodyPart)
-				+ ",\"specificity\":\"EXPLICIT\"}";
+				+ ",\"specificity\":\"" + specificity + "\"}";
 	}
 
 	static String none() {
@@ -241,6 +245,48 @@ class ActionDocumentTest {
 				.isInstanceOf(DocumentParseException.class);
 		assertThatThrownBy(() -> ActionDocumentParser.parse(document(attack(target("NONE", null, "HEAD")))))
 				.isInstanceOf(DocumentParseException.class);
+	}
+
+	// --- Target specificity ---
+
+	@Test
+	void namedTargetMarkedUnspecifiedIsRejectedWithGuidanceAndAPath() {
+		assertThatThrownBy(() -> ActionDocumentParser.parse(document(attack(target("ENTITY", "entity_1", null, "UNSPECIFIED")))))
+				.isInstanceOf(DocumentParseException.class)
+				.hasMessageStartingWith("steps[0].attack.target: ")
+				.hasMessageContaining("EXPLICIT (the player named it)")
+				.hasMessageContaining("INFERRED (you identified it from context)")
+				.hasMessageContaining("UNSPECIFIED is only for kind NONE")
+				.message().doesNotContain("ActionDocument", "com.leeburke", "Cannot construct");
+	}
+
+	@Test
+	void selfMarkedUnspecifiedAndNoneMarkedExplicitAreRejected() {
+		String selfItem = step("START", "USE_ITEM", "useItem", "{\"item\":\"item_1\",\"target\":"
+				+ target("SELF", null, null, "UNSPECIFIED") + "}");
+		assertThatThrownBy(() -> ActionDocumentParser.parse(document(selfItem))).isInstanceOf(DocumentParseException.class)
+				.hasMessageContaining("a SELF target identifies something");
+		String search = step("START", "OBSERVE", "observe", "{\"kind\":\"SEARCH\",\"target\":"
+				+ target("NONE", null, null, "EXPLICIT") + "}");
+		assertThatThrownBy(() -> ActionDocumentParser.parse(document(search))).isInstanceOf(DocumentParseException.class)
+				.hasMessageContaining("steps[0].observe.target: a NONE target identifies nothing");
+	}
+
+	@Test
+	void inferredTargetsAndUnspecifiedNoneAreAccepted() {
+		assertThat(((ActionPayload.AttackPayload) map(document(attack(target("ENTITY", "entity_1", null, "INFERRED")))).steps()
+				.getFirst().payload()).target())
+				.isEqualTo(new ActionTarget.EntityTarget("acolyte_1", Optional.empty(), TargetSpecificity.INFERRED));
+		String search = step("START", "OBSERVE", "observe", "{\"kind\":\"SEARCH\",\"target\":" + none() + "}");
+		assertThat(map(document(search)).steps().getFirst().payload())
+				.isEqualTo(new ActionPayload.ObservePayload(ObservationKind.SEARCH, ActionTarget.unspecified()));
+	}
+
+	@Test
+	void otherParseProblemsAlsoCarryTheirPath() {
+		String badMethod = attack(target("ENTITY", "entity_1", null)).replace("\"SLASH\"", "\"BITE\"");
+		assertThatThrownBy(() -> ActionDocumentParser.parse(document(badMethod))).isInstanceOf(DocumentParseException.class)
+				.hasMessageStartingWith("steps[0].attack.method: ");
 	}
 
 	// --- Alias mapping ---
