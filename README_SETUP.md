@@ -100,6 +100,8 @@ curl -s localhost:8080/api/v1/runs/$RUN -H "Authorization: Bearer $TOKEN"
 curl -s -X POST localhost:8080/api/v1/runs/$RUN/turns -H "Authorization: Bearer $TOKEN" \
   -H "Idempotency-Key: $(uuidgen)" -H "Content-Type: application/json" \
   -d '{"input": "/hold", "stateVersion": 0}'
+# Read the story so far, newest page first (pass nextBefore as ?before= for older pages)
+curl -s "localhost:8080/api/v1/runs/$RUN/chronicle?limit=20" -H "Authorization: Bearer $TOKEN"
 ```
 
 Slash commands are listed in `docs/AI_CONTRACTS.md`, for example:
@@ -159,3 +161,44 @@ One opt-in test calls the real API. The normal test run excludes it. With `OPENA
 ```powershell
 .\mvnw.cmd test "-Dgroups=ai-smoke" "-DexcludedGroups=none" "-Dtest=OpenAiSmokeTest"
 ```
+
+### Manual real-AI gameplay smoke test (REST API)
+
+`scripts/ai-gameplay-smoke.ps1` plays a short real session against a locally running server with real AI. It is opt-in, never part of the Maven tests, and refuses non-local URLs. It runs these stages:
+
+1. Create a run.
+2. Walk from the Last Lantern into the Hollow Chapel with slash commands. These need no interpreter calls, although every turn is still narrated.
+3. Attack a visible enemy in natural language.
+4. Wait a bounded number of turns for the enemy's attack.
+5. Defend in natural language.
+6. Reload the run.
+7. Replay the attack with its original idempotency key.
+
+The script prints the introduction, scenes, narration and attack cues, then a summary. It **fails if any required narration fell back** to the deterministic text.
+
+The script never prints the invite code or the run token, and it never reads the API key: the key exists only in the server's environment. A session costs roughly 10–15 small model calls.
+
+It requires **PowerShell 7**. Check with `$PSVersionTable.PSVersion` (major version 7 or later); `pwsh` is PowerShell 7, while `powershell` is Windows PowerShell 5.1. To install PowerShell 7:
+
+```powershell
+winget install --id Microsoft.PowerShell --source winget
+```
+
+**Terminal 1** (`pwsh`, repository root) starts the database and server with real AI. Choose any local invite code:
+
+```powershell
+docker compose up -d
+$env:OPENAI_API_KEY = Read-Host "OpenAI API key" -MaskInput
+$env:GAME_AI_ENABLED = "true"
+$env:GAME_AI_MODEL = "gpt-4.1-mini"
+$env:GAME_INVITE_CODES = Read-Host "Local invite code to accept" -MaskInput
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--logging.file.name=target/ai-smoke-server.log"
+```
+
+**Terminal 2** (`pwsh`, repository root), once Terminal 1 shows `Started SpringGameApplication`:
+
+```powershell
+pwsh -File scripts\ai-gameplay-smoke.ps1 -ServerLog target\ai-smoke-server.log
+```
+
+The script prompts for the invite code, with hidden input. `-ServerLog` adds per-role model, latency and token usage from the server's `ai role=` log lines, and checks that every call used `-ExpectedModel` (default `gpt-4.1-mini`). Stop the server with `Ctrl+C` and the database with `docker compose stop`.

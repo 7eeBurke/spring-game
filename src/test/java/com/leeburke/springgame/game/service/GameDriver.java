@@ -54,6 +54,20 @@ final class GameDriver {
 		this.jdbc = jdbc;
 	}
 
+	/** A strict interpreter answer: SLASH at the given creature alias with weapon_1. */
+	static String attackDocument(String alias) {
+		String target = "{\"kind\":\"ENTITY\",\"alias\":\"" + alias + "\",\"bodyPart\":null,\"specificity\":\"EXPLICIT\"}";
+		String payload = "{\"weapon\":\"weapon_1\",\"method\":\"SLASH\",\"template\":\"HORIZONTAL_SWING\",\"target\":" + target
+				+ ",\"approach\":\"NORMAL\",\"purpose\":\"DAMAGE\"}";
+		StringBuilder step = new StringBuilder("{\"relation\":\"START\",\"action\":\"ATTACK\"");
+		for (String slot : List.of("attack", "defend", "move", "interact", "observe", "useAbility", "useItem", "communicate")) {
+			step.append(",\"").append(slot).append("\":").append(slot.equals("attack") ? payload : "null");
+		}
+		step.append('}');
+		return "{\"schemaVersion\":1,\"supported\":true,\"responseToAttack\":null,\"confidence\":\"HIGH\",\"steps\":[" + step
+				+ "],\"unresolved\":[]}";
+	}
+
 	static String newToken() {
 		byte[] bytes = new byte[32];
 		TOKENS.nextBytes(bytes);

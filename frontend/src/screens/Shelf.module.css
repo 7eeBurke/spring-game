@@ -1,0 +1,223 @@
+.shelf {
+  min-height: 100dvh;
+  padding: calc(var(--space-6) + env(safe-area-inset-top)) var(--gutter) calc(var(--space-6) + env(safe-area-inset-bottom));
+}
+
+.column {
+  max-width: var(--measure);
+  margin: 0 auto;
+}
+
+.title {
+  font-size: var(--text-title);
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-align: center;
+}
+
+.subtitle {
+  margin-top: var(--space-2);
+  text-align: center;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.1rem;
+  color: var(--color-text-muted);
+}
+
+.ornament {
+  margin: var(--space-5) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-gold-dim);
+}
+
+.ornament::before,
+.ornament::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--color-rule);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.primary,
+.secondary,
+.small {
+  min-height: var(--tap);
+  border-radius: var(--radius);
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.primary {
+  border: 1px solid var(--color-gold);
+  background: var(--color-gold);
+  color: var(--color-bg);
+  font-size: 1.15rem;
+  padding: var(--space-2) var(--space-5);
+}
+
+.primary:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.secondary {
+  border: 1px solid var(--color-rule);
+  background: transparent;
+  color: var(--color-text-soft);
+  font-size: 1.05rem;
+  padding: var(--space-2) var(--space-4);
+}
+
+.small {
+  border: 1px solid var(--color-rule);
+  background: transparent;
+  color: var(--color-text-soft);
+  font-size: 0.95rem;
+  padding: var(--space-1) var(--space-3);
+}
+
+.danger {
+  color: var(--color-ember);
+  border-color: var(--color-ember-dim);
+}
+
+.heading {
+  margin: var(--space-6) 0 var(--space-3);
+  font-size: var(--text-small);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--color-gold-dim);
+}
+
+.cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.card {
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  padding: var(--space-3) var(--space-4);
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.cardName {
+  font-size: 1.35rem;
+}
+
+.cardPlace {
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: 1rem;
+}
+
+.cardButtons {
+  margin-top: var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pill {
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-label);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+}
+
+.ACTIVE { color: var(--color-gold); }
+.DEAD { color: var(--color-ember); }
+.VICTORIOUS { color: var(--color-gold-dim); }
+.PENDING,
+.UNAVAILABLE { color: var(--color-text-muted); }
+
+.empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+  text-align: center;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 1rem;
+  color: var(--color-text-soft);
+}
+
+.input {
+  min-height: var(--tap);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  font-size: 1rem;
+}
+
+.input:focus {
+  border-color: var(--color-gold-dim);
+  outline: none;
+}
+
+.code {
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  word-break: break-all;
+  resize: none;
+}
+
+.error {
+  color: var(--color-ember);
+  font-size: 1rem;
+}
+
+.status {
+  color: var(--color-text-muted);
+  font-style: italic;
+  font-size: 1rem;
+}
+
+.warning {
+  padding: var(--space-3);
+  border-left: var(--attack-rule);
+  background: var(--color-ember-wash);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.note {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}

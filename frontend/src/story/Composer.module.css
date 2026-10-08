@@ -1,0 +1,88 @@
+.defense {
+  margin-bottom: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-left: var(--attack-rule);
+  background: var(--color-ember-wash);
+  font-size: var(--text-small);
+  line-height: 1.45;
+}
+
+.defenseLabel {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--color-ember);
+  margin-right: var(--space-2);
+}
+
+.defenseHint {
+  display: block;
+  font-size: var(--text-label);
+  letter-spacing: 0.02em;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  transition: border-color 160ms ease;
+}
+
+.composer:focus-within {
+  border-color: var(--color-gold-dim);
+}
+
+.input {
+  flex: 1;
+  min-height: var(--tap);
+  max-height: 9.5rem;
+  resize: none;
+  border: 0;
+  outline: none;
+  background: transparent;
+  padding: 0.65rem 0;
+  font-family: var(--font-body);
+  font-size: 1rem; /* 16px: iOS does not zoom into the field */
+  line-height: 1.45;
+  font-style: italic;
+  color: var(--color-text);
+}
+
+.input::placeholder {
+  color: var(--color-text-muted);
+  opacity: 0.85;
+}
+
+.send {
+  flex-shrink: 0;
+  width: var(--tap);
+  height: var(--tap);
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--color-gold);
+  color: var(--color-bg);
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.send:disabled {
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.note {
+  margin-top: var(--space-1);
+  font-size: var(--text-label);
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  text-align: center;
+}

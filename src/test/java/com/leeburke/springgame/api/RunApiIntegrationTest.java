@@ -309,4 +309,51 @@ class RunApiIntegrationTest {
 			assertThat(all).as("backend entity IDs are replaced by aliases").doesNotContain("\"" + entity.id() + "\"");
 		}
 	}
+
+	// --- Chronicle and cache safety (Stage 15A) ---
+
+	@Test
+	void theChronicleIsOwnedPagedAndNeverCached() throws Exception {
+		Run run = newRun();
+		Run other = newRun();
+		String key = UUID.randomUUID().toString();
+		MockHttpServletResponse played = perform(turn(run.id(), run.token(), key, body("/hold", 0)));
+		assertThat(played.getStatus()).isEqualTo(200);
+
+		MockHttpServletResponse own = perform(get("/api/v1/runs/" + run.id() + "/chronicle").header("Authorization", "Bearer " + run.token()));
+		MockHttpServletResponse paged = perform(get("/api/v1/runs/" + run.id() + "/chronicle?limit=1&before=2")
+				.header("Authorization", "Bearer " + run.token()));
+		MockHttpServletResponse anonymous = perform(get("/api/v1/runs/" + run.id() + "/chronicle"));
+		MockHttpServletResponse foreign = perform(get("/api/v1/runs/" + run.id() + "/chronicle").header("Authorization", "Bearer " + other.token()));
+		MockHttpServletResponse badLimit = perform(get("/api/v1/runs/" + run.id() + "/chronicle?limit=51").header("Authorization", "Bearer " + run.token()));
+		MockHttpServletResponse badBefore = perform(get("/api/v1/runs/" + run.id() + "/chronicle?before=zero").header("Authorization", "Bearer " + run.token()));
+
+		assertThat(own.getStatus()).isEqualTo(200);
+		JsonNode chronicle = json(own);
+		assertThat(chronicle.path("opening").path("introduction").path("text").asString()).isNotBlank();
+		assertThat(chronicle.path("turns").get(0).path("action").path("text").asString()).isEqualTo("/hold");
+		assertThat(chronicle.path("turns").get(0).path("narration").path("text").asString())
+				.isEqualTo(json(played).path("narration").path("text").asString());
+		assertThat(json(paged).path("turns").size()).isEqualTo(1);
+		assertThat(anonymous.getStatus()).isEqualTo(401);
+		assertThat(foreign.getStatus()).isEqualTo(404);
+		assertThat(code(foreign)).isEqualTo("RUN_NOT_FOUND");
+		assertThat(badLimit.getStatus()).isEqualTo(400);
+		assertThat(badBefore.getStatus()).isEqualTo(400);
+
+		for (MockHttpServletResponse response : List.of(played, own, anonymous, foreign, badLimit,
+				perform(get("/api/v1/runs/" + run.id()).header("Authorization", "Bearer " + run.token())),
+				perform(create("api-invite", UUID.randomUUID().toString(), token())))) {
+			assertThat(response.getHeader("Cache-Control")).as(response.getContentAsString()).isEqualTo("no-store");
+		}
+
+		String all = own.getContentAsString();
+		long seed = jdbc.queryForObject("SELECT run_seed FROM game_run WHERE id = ?", Long.class, run.id());
+		assertThat(all).doesNotContain(String.valueOf(seed)).doesNotContain(run.token()).doesNotContain(key)
+				.doesNotContain("difficulty").doesNotContain("attack-").doesNotContain("Seed").doesNotContain("revision")
+				.doesNotContain("request").doesNotContain("lease").doesNotContain("hash").doesNotContain("summary");
+		for (UUID sceneId : jdbc.queryForList("SELECT id FROM scene_instance WHERE run_id = ?", UUID.class, run.id())) {
+			assertThat(all).doesNotContain(sceneId.toString());
+		}
+	}
 }

@@ -1,0 +1,40 @@
+/*
+ * The story screen: a slim header, the chronicle taking almost all of the height, and the composer
+ * anchored at the bottom. 100dvh follows the mobile browser chrome; the composer clears the home
+ * indicator through the safe-area inset.
+ */
+.screen {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100dvh;
+  min-height: 0;
+  background: var(--color-bg);
+}
+
+.chronicle {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-padding-bottom: var(--space-6);
+}
+
+.column {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: var(--space-5) var(--gutter) var(--space-6);
+  padding-left: max(var(--gutter), env(safe-area-inset-left));
+  padding-right: max(var(--gutter), env(safe-area-inset-right));
+}
+
+.footer {
+  border-top: 1px solid var(--color-rule);
+  background: linear-gradient(to bottom, var(--color-surface), var(--color-bg));
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.footerInner {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: var(--space-2) var(--gutter) var(--space-2);
+}

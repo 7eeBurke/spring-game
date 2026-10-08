@@ -1,0 +1,81 @@
+/* Self-hosted fonts: no CDN, works offline, nothing leaks to a third party. */
+/* The opsz build lets the browser match Literata's optical size to the rendered size (finer strokes
+   at body sizes); the wght-only build is fixed at a heavier text optical size. */
+@import '@fontsource-variable/literata/opsz.css';
+@import '@fontsource-variable/literata/opsz-italic.css';
+@import '@fontsource/cormorant-garamond/500.css';
+@import '@fontsource/cormorant-garamond/600.css';
+@import '@fontsource/cormorant-garamond/500-italic.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  font-weight: var(--weight-body);
+  line-height: var(--leading-body);
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: var(--leading-tight);
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+::selection {
+  background: rgba(194, 161, 93, 0.35);
+}

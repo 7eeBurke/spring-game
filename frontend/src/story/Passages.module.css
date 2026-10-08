@@ -1,0 +1,154 @@
+.passage {
+  margin: 0 0 var(--passage-gap);
+}
+
+/* Narration: full-width literary prose. */
+.narration p + p {
+  margin-top: 0.85em;
+}
+
+.introduction p:first-child::first-letter {
+  font-family: var(--font-display);
+  font-size: 3.1em;
+  line-height: 0.82;
+  float: left;
+  margin: 0.06em 0.08em 0 0;
+  color: var(--color-gold);
+}
+
+.plain {
+  display: block;
+  margin-top: var(--space-2);
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* The player's own words: indented, quieter, a fine gold rule. */
+.player {
+  margin: 0 0 var(--passage-gap);
+  padding: var(--space-1) 0 var(--space-1) var(--player-indent);
+  border-left: var(--player-rule);
+  color: var(--color-text-soft);
+  font-size: var(--text-action);
+  font-style: italic;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.label {
+  display: block;
+  font-family: var(--font-display);
+  font-style: normal;
+  font-size: var(--text-small);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--color-gold-dim);
+  margin-bottom: 0.15rem;
+}
+
+.command {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--color-text-muted);
+}
+
+/* Scene transitions read like chapter openings. */
+.scene {
+  margin: var(--space-6) 0 var(--space-5);
+  text-align: center;
+}
+
+.sceneRule {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-gold);
+}
+
+.sceneRule::before,
+.sceneRule::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--color-rule);
+}
+
+.sceneTitle {
+  font-size: var(--text-heading);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  font-variant: small-caps;
+}
+
+.sceneSub {
+  margin-top: var(--space-1);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.05rem;
+  color: var(--color-text-muted);
+}
+
+/* An incoming blow: restrained ember, never a flashing alarm. */
+.attack {
+  margin: 0 0 var(--passage-gap);
+  padding: var(--space-3) var(--space-4);
+  border-left: var(--attack-rule);
+  background: var(--color-ember-wash);
+}
+
+.attackLabel {
+  display: block;
+  font-family: var(--font-display);
+  font-size: var(--text-small);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--color-ember);
+}
+
+.cue {
+  margin: var(--space-1) 0 var(--space-2);
+  font-weight: var(--weight-emphasis);
+  color: var(--color-text);
+}
+
+.attack .narration {
+  color: var(--color-text-soft);
+}
+
+/* The end of a run. */
+.ending {
+  margin: var(--space-7) 0 var(--space-6);
+  text-align: center;
+}
+
+.endingTitle {
+  font-size: var(--text-title);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.endingDead {
+  color: var(--color-ember);
+}
+
+.endingVictory {
+  color: var(--color-gold);
+}
+
+.endingSub {
+  margin-top: var(--space-2);
+  font-family: var(--font-display);
+  font-style: italic;
+  color: var(--color-text-muted);
+}
+
+.pending {
+  margin: 0 0 var(--passage-gap);
+  font-family: var(--font-display);
+  font-style: italic;
+  color: var(--color-text-muted);
+}

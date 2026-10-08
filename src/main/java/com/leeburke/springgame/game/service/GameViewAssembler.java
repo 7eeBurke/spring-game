@@ -16,6 +16,7 @@ import com.leeburke.springgame.ai.interpreter.AliasKind;
 import com.leeburke.springgame.ai.interpreter.InterpretationSetup;
 import com.leeburke.springgame.ai.narration.FatedBand;
 import com.leeburke.springgame.character.PlayerCharacterState;
+import com.leeburke.springgame.content.world.RegionDefinition;
 import com.leeburke.springgame.content.world.WorldContentCatalog;
 import com.leeburke.springgame.game.GameSnapshot;
 import com.leeburke.springgame.game.PendingAttack;
@@ -25,11 +26,11 @@ import com.leeburke.springgame.game.RunStatus;
 import com.leeburke.springgame.game.TurnStatus;
 import com.leeburke.springgame.game.view.GameView;
 import com.leeburke.springgame.game.view.GameView.NarrationView;
-import com.leeburke.springgame.game.view.TurnResponse;
 import com.leeburke.springgame.mechanics.StatType;
 import com.leeburke.springgame.persistence.IntroductionStore;
 import com.leeburke.springgame.persistence.RunSessionStore;
 import com.leeburke.springgame.persistence.TurnStore;
+import com.leeburke.springgame.persistence.WorldStore;
 
 /**
  * Builds the player's {@link GameView} from the same interpretation context the Action Interpreter
@@ -45,16 +46,18 @@ class GameViewAssembler {
 	private final IntroductionStore introductions;
 	private final TurnStore turns;
 	private final WorldContentCatalog world;
-	private final TurnJson json = new TurnJson();
+	private final WorldStore worldStore;
+	private final StoredResponses responses = new StoredResponses();
 
 	GameViewAssembler(RunSessionStore sessions, GameStateLoader loader, ResolutionContextFactory contexts,
-			IntroductionStore introductions, TurnStore turns, WorldContentCatalog world) {
+			IntroductionStore introductions, TurnStore turns, WorldContentCatalog world, WorldStore worldStore) {
 		this.sessions = Objects.requireNonNull(sessions, "sessions");
 		this.loader = Objects.requireNonNull(loader, "loader");
 		this.contexts = Objects.requireNonNull(contexts, "contexts");
 		this.introductions = Objects.requireNonNull(introductions, "introductions");
 		this.turns = Objects.requireNonNull(turns, "turns");
 		this.world = Objects.requireNonNull(world, "world");
+		this.worldStore = Objects.requireNonNull(worldStore, "worldStore");
 	}
 
 	/** The current view, as GET shows it. */
@@ -64,7 +67,7 @@ class GameViewAssembler {
 		Optional<TurnStore.TurnRecord> latest = turns.findLatestCommitted(runId);
 		boolean finalizing = latest.filter(t -> t.status() == TurnStatus.MECHANICS_COMMITTED).isPresent();
 		Optional<GameView.LastTurnView> lastTurn = latest.map(t -> new GameView.LastTurnView(t.turnNumber().getAsInt(),
-				t.responseJson().map(body -> json.read(body, TurnResponse.class).narration()).orElse(null)));
+				t.responseJson().flatMap(responses::narration).orElse(null)));
 		return assemble(session, finalizing, lastTurn);
 	}
 
@@ -92,7 +95,7 @@ class GameViewAssembler {
 		String awaiting = session.status() != RunStatus.ACTIVE ? "NONE" : snapshot.pending().isPresent() ? "DEFENSE" : "ACTION";
 		NarrationView introduction = introductions.find(session.runId())
 				.map(i -> new NarrationView(i.text(), i.source().name())).orElse(null);
-		GameView.LocationView location = new GameView.LocationView(SceneNames.scene(world, snapshot.scene()),
+		GameView.LocationView location = new GameView.LocationView(regionName(snapshot), SceneNames.scene(world, snapshot.scene()),
 				new GameView.ZoneView(context.currentZone(), zoneNames.get(context.currentZone())));
 		GameView.SceneView scene = new GameView.SceneView(
 				context.zones().stream().map(z -> new GameView.ZoneView(z.alias(), z.name())).toList(),
@@ -103,6 +106,14 @@ class GameViewAssembler {
 		GameView.PendingAttackView pending = snapshot.pending().map(p -> pendingView(p, setup)).orElse(null);
 		return new GameView(session.runId(), session.status().name(), session.stateVersion(), awaiting, finalizing,
 				introduction, character(snapshot.player(), context), location, scene, pending, lastTurn.orElse(null));
+	}
+
+	private String regionName(GameSnapshot snapshot) {
+		return snapshot.scene().regionInstanceId()
+				.map(id -> worldStore.findRegion(id).orElseThrow(() -> new IllegalStateException("Region " + id + " is missing")))
+				.map(region -> world.findRegion(region.definitionCode()).map(RegionDefinition::displayName)
+						.orElseThrow(() -> new IllegalStateException("Unknown region " + region.definitionCode())))
+				.orElse(null);
 	}
 
 	private static GameView.PendingAttackView pendingView(PendingAttack pending, InterpretationSetup setup) {

@@ -387,7 +387,7 @@ The introduction is generated once per run and persisted; reloading returns the 
 
 Failures are classified as `DISABLED`, `NOT_CONFIGURED`, `TIMEOUT`, `AUTHENTICATION`, `RATE_LIMITED`, `PROVIDER_ERROR`, `NETWORK`, `REFUSED`, `TRUNCATED` or `MALFORMED_RESPONSE`, and returned with the result; they are never silently treated as success. No game state ever depends on partially parsed model output, and narration never mutates state.
 
-Each call writes one log line with the role, prompt version, model, latency, attempts, outcome and the token usage the provider reported (input, cached input, output and reasoning tokens; the interpreter sums its attempts). Usage is operational metadata only: logged, never persisted, never game state. Keys, headers, player text, prompts, model output and game state are never logged, and model reasoning is never requested or stored.
+Each call writes one log line with the role, prompt version, model, latency, attempts, outcome and the token usage the provider reported (input, cached input, output and reasoning tokens; the interpreter sums its attempts). Usage is operational metadata only: logged, never persisted, never game state. Keys, headers, player text, prompts, model output and game state are never logged, and model reasoning is never requested or stored. The exact wording of accepted actions is persisted (`run_turn.player_input`, Stage 15A) so the run's chronicle can show it. It is readable only with the run's token, and it is not given to any model beyond the bounded excerpt described for the Outcome Narrator.
 
 The game remains mechanically playable without a live model.
 

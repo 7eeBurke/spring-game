@@ -1,0 +1,69 @@
+/*
+ * Design tokens for the storybook. Every colour, size and timing the components use lives here so
+ * presentation can be tuned after playtesting without touching components.
+ */
+:root {
+  /* Palette: charcoal ground, aged ivory text, muted gold, restrained ember for danger. */
+  --color-bg: #141210;
+  --color-surface: #1c1916;
+  --color-surface-raised: #24201c;
+  --color-rule: #3a332b;
+  --color-text: #e9e1cf;
+  --color-text-soft: #cfc6b3;
+  --color-text-muted: #a99f8c;
+  --color-gold: #c2a15d;
+  --color-gold-dim: #8c7543;
+  --color-ember: #c9584a;
+  --color-ember-dim: #8f3a30;
+  --color-ember-wash: rgba(201, 88, 74, 0.07);
+  --color-gold-wash: rgba(194, 161, 93, 0.05);
+  --color-focus: #e2c27e;
+  --color-backdrop: rgba(8, 7, 6, 0.72);
+
+  /* Type: elegant display face for headings, a screen-reading serif for the story. */
+  --font-display: 'Cormorant Garamond', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-body: 'Literata Variable', 'Iowan Old Style', Georgia, serif;
+  --text-body: 1.125rem;          /* 18px narration */
+  --text-action: 1.0625rem;       /* player passages, a touch quieter */
+  --text-small: 0.875rem;
+  --text-label: 0.75rem;
+  --text-heading: 1.625rem;
+  --text-title: 2.25rem;
+  --weight-body: 400;            /* narration: regular, for long reading sessions */
+  --weight-emphasis: 600;        /* attack cues and other combat emphasis */
+  --leading-body: 1.68;
+  --leading-tight: 1.25;
+  --tracking-caps: 0.14em;
+
+  /* Space and measure. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --measure: 38rem;               /* reading column on wide screens */
+  --gutter: 1.25rem;              /* side margin on phones */
+  --passage-gap: 1.35rem;         /* space between story passages */
+  --radius: 3px;
+  --tap: 2.75rem;                 /* 44px minimum tap target */
+
+  /* Story styling knobs. */
+  --player-indent: 1.1rem;
+  --player-rule: 2px solid var(--color-gold-dim);
+  --attack-rule: 2px solid var(--color-ember);
+
+  /* Motion (narration reveal arrives in 15C; reduced motion turns these off). */
+  --reveal-step: 250ms;
+  --reveal-fade: 420ms;
+  --sheet-slide: 220ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --reveal-step: 0ms;
+    --reveal-fade: 0ms;
+    --sheet-slide: 0ms;
+  }
+}

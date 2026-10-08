@@ -40,9 +40,16 @@ class ApiWebConfiguration implements WebMvcConfigurer {
 	}
 
 	/**
-	 * Static so the servlet container can register the filter early, during its own startup, without
-	 * instantiating this configuration and its dependencies (which need JPA) too soon.
+	 * The filter beans are static so the servlet container can register them early, during its own
+	 * startup, without instantiating this configuration and its dependencies (which need JPA) too soon.
 	 */
+	@Bean
+	static FilterRegistrationBean<ApiCacheControlFilter> apiCacheControlFilter() {
+		FilterRegistrationBean<ApiCacheControlFilter> registration = new FilterRegistrationBean<>(new ApiCacheControlFilter());
+		registration.addUrlPatterns("/api/*");
+		return registration;
+	}
+
 	@Bean
 	static FilterRegistrationBean<RequestSizeLimitFilter> requestSizeLimitFilter() {
 		FilterRegistrationBean<RequestSizeLimitFilter> registration = new FilterRegistrationBean<>(new RequestSizeLimitFilter());

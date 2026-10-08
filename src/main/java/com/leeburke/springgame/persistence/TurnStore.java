@@ -33,7 +33,7 @@ public class TurnStore {
 
 	private static final String COLUMNS = "run_id, request_key, request_hash, base_state_version, status, lease_owner, "
 			+ "lease_until, narration_owner, narration_lease_until, turn_number, mechanics_summary::text AS summary, "
-			+ "response_status, response AS response_json";
+			+ "response_status, response AS response_json, player_input";
 
 	private final JdbcClient jdbc;
 
@@ -62,18 +62,29 @@ public class TurnStore {
 	}
 
 	/**
-	 * Starts a turn. Fails with a {@code DuplicateKeyException} if the key exists or the run already
-	 * has an unfinished turn (partial unique index).
+	 * The run's mechanically committed turns (COMPLETED or MECHANICS_COMMITTED) numbered below
+	 * {@code beforeTurn}, newest first, at most {@code limit} of them. Turn numbers are dense and
+	 * unique per run, so they are a stable pagination cursor.
+	 */
+	@Transactional(readOnly = true)
+	public List<TurnRecord> findCommittedBefore(UUID runId, int beforeTurn, int limit) {
+		return jdbc.sql("SELECT " + COLUMNS + " FROM run_turn WHERE run_id = ? AND turn_number IS NOT NULL AND turn_number < ? "
+				+ "ORDER BY turn_number DESC LIMIT ?").params(runId, beforeTurn, limit).query(TurnStore::map).list();
+	}
+
+	/**
+	 * Starts a turn, recording the player's exact wording. Fails with a {@code DuplicateKeyException}
+	 * if the key exists or the run already has an unfinished turn (partial unique index).
 	 */
 	@Transactional
 	public void insertInterpreting(UUID runId, UUID requestKey, String requestHash, long baseStateVersion, UUID leaseOwner,
-			Instant leaseUntil, Instant now) {
-		jdbc.sql("INSERT INTO run_turn (run_id, request_key, request_hash, base_state_version, status, lease_owner, lease_until, created_at) "
-				+ "VALUES (?, ?, ?, ?, 'INTERPRETING', ?, ?, ?)")
-				.params(runId, requestKey, requestHash, baseStateVersion, leaseOwner, ts(leaseUntil), ts(now)).update();
+			Instant leaseUntil, Instant now, String playerInput) {
+		jdbc.sql("INSERT INTO run_turn (run_id, request_key, request_hash, base_state_version, status, lease_owner, lease_until, "
+				+ "created_at, player_input) VALUES (?, ?, ?, ?, 'INTERPRETING', ?, ?, ?, ?)")
+				.params(runId, requestKey, requestHash, baseStateVersion, leaseOwner, ts(leaseUntil), ts(now), playerInput).update();
 	}
 
-	/** Stores a request that was answered without starting a turn (a stale view). */
+	/** Stores a request that was answered without starting a turn (a stale view). Its wording is not kept. */
 	@Transactional
 	public void insertFinished(UUID runId, UUID requestKey, String requestHash, long baseStateVersion, TurnStatus status,
 			int responseStatus, String responseJson, Instant now) {
@@ -105,12 +116,15 @@ public class TurnStore {
 				.params(runId, requestKey, leaseOwner).update() == 1;
 	}
 
-	/** Finishes this owner's INTERPRETING record with a stored error (REJECTED or STALE). */
+	/**
+	 * Finishes this owner's INTERPRETING record with a stored error (REJECTED or STALE). The player's
+	 * wording is cleared: only accepted actions are kept.
+	 */
 	@Transactional
 	public boolean finish(UUID runId, UUID requestKey, UUID leaseOwner, TurnStatus status, int responseStatus, String responseJson) {
 		requireFinal(status);
 		return jdbc.sql("UPDATE run_turn SET status = ?, response_status = ?, response = ?, lease_owner = NULL, "
-				+ "lease_until = NULL WHERE run_id = ? AND request_key = ? AND status = 'INTERPRETING' AND lease_owner = ?")
+				+ "lease_until = NULL, player_input = NULL WHERE run_id = ? AND request_key = ? AND status = 'INTERPRETING' AND lease_owner = ?")
 				.params(status.name(), responseStatus, responseJson, runId, requestKey, leaseOwner).update() == 1;
 	}
 
@@ -180,7 +194,8 @@ public class TurnStore {
 				rs.getString("request_hash"), rs.getLong("base_state_version"), TurnStatus.valueOf(rs.getString("status")),
 				Optional.ofNullable(rs.getObject("lease_owner", UUID.class)), instant(rs, "lease_until"),
 				Optional.ofNullable(rs.getObject("narration_owner", UUID.class)), instant(rs, "narration_lease_until"),
-				turn, Optional.ofNullable(rs.getString("summary")), status, Optional.ofNullable(rs.getString("response_json")));
+				turn, Optional.ofNullable(rs.getString("summary")), status, Optional.ofNullable(rs.getString("response_json")),
+				Optional.ofNullable(rs.getString("player_input")));
 	}
 
 	private static Optional<Instant> instant(ResultSet rs, String column) throws SQLException {
@@ -191,7 +206,7 @@ public class TurnStore {
 	public record TurnRecord(UUID runId, UUID requestKey, String requestHash, long baseStateVersion, TurnStatus status,
 			Optional<UUID> leaseOwner, Optional<Instant> leaseUntil, Optional<UUID> narrationOwner,
 			Optional<Instant> narrationLeaseUntil, OptionalInt turnNumber, Optional<String> summaryJson,
-			OptionalInt responseStatus, Optional<String> responseJson) {
+			OptionalInt responseStatus, Optional<String> responseJson, Optional<String> playerInput) {
 	}
 
 	/** The enemy that acted on a turn and what it chose (an option code or HOLD). */

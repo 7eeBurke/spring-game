@@ -435,7 +435,26 @@ Each turn request is a `run_turn` row keyed by `(run_id, Idempotency-Key)`, with
 
 ### Read Path
 
-`GET /runs/{runId}` builds the view inside a read-only transaction from the same `InterpretationSetup` the interpreter would receive, so the view, slash commands and the interpreter share one alias scheme and one visibility filter. It never calls AI and never writes. While a turn's narration is pending, `finalizing` is true and `lastTurn.narration` is null. A pending attack always carries its stored Java `cueText`.
+`GET /runs/{runId}` builds the view inside a read-only transaction from the same `InterpretationSetup` the interpreter would receive, so the view, slash commands and the interpreter share one alias scheme and one visibility filter. It never calls AI and never writes. While a turn's narration is pending, `finalizing` is true and `lastTurn.narration` is null. A pending attack always carries its stored Java `cueText`. `location.region` names the region, and is null in the hub (Stage 15A).
+
+### Chronicle (Stage 15A)
+
+`GET /runs/{runId}/chronicle?before={turnNumber}&limit={1..50, default 20}` returns the run's story one page at a time, oldest turn first. It needs no history table of its own. It is rebuilt from what the turn pipeline already stores:
+- **Opening:** the introduction (`character_introduction`) and the starting place, the hub's start zone. It is returned only on the page that reaches the start of the run, including a run with no turns yet.
+- **One entry per mechanically committed `run_turn`:**
+  - the player's accepted wording (`player_input`, V7);
+  - the confirmed changes from its `mechanics_summary`: scene entered with its arrival zone, the enemy's response, the attack's Java cue, and the ending;
+  - once finalised, the outcome narration and the attack narration read from its stored response.
+
+Properties that follow from this:
+- **No duplicates.** Turn numbers are unique and dense, so retries and crash recovery can never duplicate an entry, and the turn number is a stable cursor.
+- **Cues survive.** An attack's cue is rebuilt from the summary, so it stays in history after the pending attack is consumed.
+- **Unfinalised turns** appear with `narrationPending: true` and no narration.
+- **Rejected and stale requests never appear.** Their wording is cleared when they finish.
+- **Read-only.** Reading never calls AI and never writes.
+- **Loose coupling.** Stored responses are read by path (`StoredResponses`), so responses stored by earlier versions stay readable as the response format grows.
+
+All `/api/**` responses, including errors, carry `Cache-Control: no-store`.
 
 ### API and Errors
 
@@ -443,6 +462,7 @@ Each turn request is a `run_turn` row keyed by `(run_id, Idempotency-Key)`, with
 |---|---|---|
 | `POST` | `/api/v1/runs` | `X-Invite-Code`, `Idempotency-Key`, client token |
 | `GET` | `/api/v1/runs/{runId}` | Bearer token |
+| `GET` | `/api/v1/runs/{runId}/chronicle` | Bearer token; `before`, `limit` |
 | `POST` | `/api/v1/runs/{runId}/turns` | Bearer token and `Idempotency-Key`; body `{input, stateVersion}` |
 
 **Run tokens:**
@@ -491,3 +511,11 @@ Client identity is only the socket address; `X-Forwarded-For` and similar header
   - turn number, the acting enemy and its choice;
   - `mechanics_summary` (JSONB, required once mechanics commit) and the exact response (text);
   - `UNIQUE (run_id, turn_number)`, and a partial unique index allowing one unfinished turn per run.
+
+### Current Tables (V7)
+
+- `run_turn.player_input`:
+  - the exact accepted wording of a turn, 1–500 characters;
+  - written when the request is recorded, and cleared when it ends `REJECTED` or `STALE`;
+  - NULL for rows from before V7;
+  - player data: readable only with the run's token, never logged.

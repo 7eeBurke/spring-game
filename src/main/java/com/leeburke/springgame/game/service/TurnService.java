@@ -151,7 +151,7 @@ public class TurnService {
 		}
 		String requestHash = RunTokens.sha256Hex(stateVersion + "\n" + input);
 
-		Claim claim = claim(runId, requestKey, requestHash, stateVersion);
+		Claim claim = claim(runId, requestKey, requestHash, stateVersion, input);
 		if (claim.reply().isPresent()) {
 			return claim.reply().get();
 		}
@@ -223,7 +223,7 @@ public class TurnService {
 	}
 
 	/** Phase 1: replay, finalise, or start this request as the run's one unfinished turn. */
-	private Claim claim(UUID runId, UUID requestKey, String requestHash, long stateVersion) {
+	private Claim claim(UUID runId, UUID requestKey, String requestHash, long stateVersion, String input) {
 		for (int attempt = 0; attempt < MAX_CLAIM_ATTEMPTS; attempt++) {
 			Instant now = clock.instant();
 			Optional<TurnRecord> existing = turns.find(runId, requestKey);
@@ -282,7 +282,7 @@ public class TurnService {
 				}
 				limits.acquireTurn(runId);
 				UUID owner = UUID.randomUUID();
-				turns.insertInterpreting(runId, requestKey, requestHash, stateVersion, owner, now.plus(lease), now);
+				turns.insertInterpreting(runId, requestKey, requestHash, stateVersion, owner, now.plus(lease), now, input);
 				return Claim.owned(owner);
 			} catch (DuplicateKeyException race) {
 				// Another request inserted this key or another unfinished turn first: look again.

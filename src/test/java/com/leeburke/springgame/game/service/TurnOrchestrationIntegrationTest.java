@@ -91,20 +91,6 @@ class TurnOrchestrationIntegrationTest {
 		return counting;
 	}
 
-	/** A strict interpreter answer: SLASH at the given creature alias with weapon_1. */
-	private static String attackDocument(String alias) {
-		String target = "{\"kind\":\"ENTITY\",\"alias\":\"" + alias + "\",\"bodyPart\":null,\"specificity\":\"EXPLICIT\"}";
-		String payload = "{\"weapon\":\"weapon_1\",\"method\":\"SLASH\",\"template\":\"HORIZONTAL_SWING\",\"target\":" + target
-				+ ",\"approach\":\"NORMAL\",\"purpose\":\"DAMAGE\"}";
-		StringBuilder step = new StringBuilder("{\"relation\":\"START\",\"action\":\"ATTACK\"");
-		for (String slot : List.of("attack", "defend", "move", "interact", "observe", "useAbility", "useItem", "communicate")) {
-			step.append(",\"").append(slot).append("\":").append(slot.equals("attack") ? payload : "null");
-		}
-		step.append('}');
-		return "{\"schemaVersion\":1,\"supported\":true,\"responseToAttack\":null,\"confidence\":\"HIGH\",\"steps\":[" + step
-				+ "],\"unresolved\":[]}";
-	}
-
 	// --- Run creation ---
 
 	@Test
@@ -419,7 +405,7 @@ class TurnOrchestrationIntegrationTest {
 				});
 		assertThat(game.count("SELECT count(*) FROM run_turn WHERE run_id = ?", runId)).isZero();
 
-		CountingAi working = counting().answerStructured(attackDocument(alias));
+		CountingAi working = counting().answerStructured(GameDriver.attackDocument(alias));
 		Reply retried = game.turn(runId, key, "I cut at the nearest one", 0);
 
 		assertThat(retried.status()).as(retried.raw()).isEqualTo(200);
@@ -434,7 +420,7 @@ class TurnOrchestrationIntegrationTest {
 		UUID runId = game.newRun();
 		UUID key = UUID.randomUUID();
 		turnStore.insertInterpreting(runId, key, RunTokens.sha256Hex("0\n/hold"), 0, UUID.randomUUID(),
-				clock.instant().plusSeconds(60), clock.instant());
+				clock.instant().plusSeconds(60), clock.instant(), "/hold");
 
 		assertThatThrownBy(() -> game.turn(runId, key, "/hold", 0))
 				.isInstanceOfSatisfying(GameException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.REQUEST_IN_PROGRESS));
@@ -447,7 +433,8 @@ class TurnOrchestrationIntegrationTest {
 	void anotherKeysAbandonedTurnIsClearedOnlyAfterItsLeaseExpires() {
 		UUID runId = game.newRun();
 		UUID abandoned = UUID.randomUUID();
-		turnStore.insertInterpreting(runId, abandoned, "x", 0, UUID.randomUUID(), clock.instant().plusSeconds(60), clock.instant());
+		turnStore.insertInterpreting(runId, abandoned, "x", 0, UUID.randomUUID(), clock.instant().plusSeconds(60), clock.instant(),
+				"/hold");
 
 		assertThatThrownBy(() -> game.turn(runId, "/hold"))
 				.isInstanceOfSatisfying(GameException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.REQUEST_IN_PROGRESS));
@@ -463,7 +450,7 @@ class TurnOrchestrationIntegrationTest {
 		SceneInstance scene = game.placeAmongEnemies(runId, 1);
 		String alias = game.alias(scene, game.visibleEnemies(scene).getFirst().entityId());
 		UUID key = UUID.randomUUID();
-		counting().answerStructured(attackDocument(alias)).beforeStructured(() -> {
+		counting().answerStructured(GameDriver.attackDocument(alias)).beforeStructured(() -> {
 			// While the slow model call runs, the lease expires and a retry takes the turn over.
 			clock.advance(Duration.ofMinutes(3));
 			assertThat(turnStore.takeOver(runId, key, UUID.randomUUID(), clock.instant().plusSeconds(120), clock.instant())).isTrue();

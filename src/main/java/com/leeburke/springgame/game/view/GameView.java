@@ -32,7 +32,8 @@ public record GameView(UUID runId, String status, long stateVersion, String awai
 	public record OwnedView(String alias, String name) {
 	}
 
-	public record LocationView(String scene, ZoneView zone) {
+	/** @param region the region's name, or null outside any region (the Last Lantern hub) */
+	public record LocationView(String region, String scene, ZoneView zone) {
 	}
 
 	public record ZoneView(String alias, String name) {
