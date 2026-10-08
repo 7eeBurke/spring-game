@@ -153,6 +153,21 @@ Definitions deliberately do not yet contain:
 
 These remain deferred (see `DEFERRED_DECISIONS.md`).
 
+# Lore
+
+`src/main/resources/content/lore.json` holds the fixed world premise that the Character Introduction Narrator restates. It is loaded strictly by `LoreCatalog` and is canon kept in a resource, not in prompt code.
+
+Schema: `{ "premise": [ non-blank strings ] }`, with at least one line.
+
+Bundled premise:
+1. The world is sustained by a single fading supernatural flame.
+2. As the flame weakens, the dead rise.
+3. Time and reality have begun to distort.
+4. You are a Bound Soul.
+5. The Last Lantern is a small refuge on the road to the Hollow Chapel.
+
+Narrators may restate this premise but never extend it with new canon. Expanding the lore needs explicit approval.
+
 # World Generation Content
 
 Authored world-generation content lives in `src/main/resources/content/world/` and is loaded by `WorldContentLoader` into an immutable `WorldContentCatalog`, with the same strict loading rules as the files above. It is static classpath content, never stored in the database; PostgreSQL stores only generated instances.

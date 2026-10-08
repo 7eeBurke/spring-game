@@ -75,3 +75,39 @@ The datasource defaults are in `src/main/resources/application.properties`. Over
 | `SPRING_GAME_DB_PORT` (Compose host port) | `5433` |
 
 Do not commit real credentials.
+
+## Optional: AI
+
+The game runs fully without AI. AI is **off by default**, and every AI role then uses its deterministic fallback. Actions use slash commands such as `/attack entity_1 slash` (see `docs/AI_CONTRACTS.md`), and narration uses factual templates. The tests never call a real model and need no key.
+
+To enable the OpenAI provider for the current PowerShell session:
+
+```powershell
+$env:GAME_AI_ENABLED = "true"
+$env:OPENAI_API_KEY = "<your key>"
+$env:GAME_AI_MODEL = "<an OpenAI model ID that supports structured outputs>"
+.\mvnw.cmd spring-boot:run
+```
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `GAME_AI_ENABLED` | `false` | Switches the AI roles on |
+| `OPENAI_API_KEY` | empty | API key. Never commit it; it is never logged |
+| `GAME_AI_MODEL` | empty | Model ID for all roles. There is deliberately no default |
+| `OPENAI_BASE_URL` | the SDK default | Optional API base URL |
+
+If AI is enabled but the key or model is missing, the application still starts. It logs one warning naming the missing variable, and the roles use their fallbacks.
+
+Further optional settings go in `application.properties` or as environment variables:
+- `game.ai.timeout` (default `20s`) and `game.ai.max-retries` (default `1`).
+- Per role: `game.ai.roles.<role>.model`, `.max-output-tokens` and `.temperature`. The roles are `action-interpreter`, `outcome-narrator`, `enemy-attack-narrator` and `character-introduction`.
+
+Default output-token limits are 1500 for the interpreter, 400 for the outcome narrator, 200 for the enemy attack narrator and 600 for the introduction. Reasoning models spend output tokens on reasoning, so raise these if responses come back truncated; a truncated response falls back.
+
+### Manual AI smoke test
+
+One opt-in test calls the real API. The normal test run excludes it. With `OPENAI_API_KEY` and `GAME_AI_MODEL` set:
+
+```powershell
+.\mvnw.cmd test "-Dgroups=ai-smoke" "-DexcludedGroups=none" "-Dtest=OpenAiSmokeTest"
+```

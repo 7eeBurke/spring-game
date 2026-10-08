@@ -99,9 +99,9 @@ Fated is not luck. Higher Fated increases unusual/consequential events, whether 
 
 Fated is visible to the player as a 0–5 character attribute. The internal Fated probabilities and how Fated influences generation remain hidden.
 
-Character generation currently stores only the numeric value. Fated consequences, including use of the qualitative bands below, are deferred (see `DEFERRED_DECISIONS.md`).
+Character generation stores only the numeric value. Fated's gameplay consequences are deferred (see `DEFERRED_DECISIONS.md`).
 
-Qualitative narration bands may be:
+Qualitative narration bands (`FatedBand`). They are narration-only labels given to the Character Introduction Narrator, with no mechanical effect and no probabilities:
 - 0 `ORDINARY`
 - 1–2 `TOUCHED`
 - 3 `UNUSUAL`
@@ -258,6 +258,14 @@ Generation flow:
 15. persist introduction;
 16. present introduction + character sheet + first scene.
 
-Steps 2–9 and 11 are implemented as in-memory generation. Persistence, the introduction context and narration come later.
+Steps 2–9 and 11 are in-memory generation, and step 12 is `GameRunStore.createRun`. Steps 13–15 are `CharacterIntroductionService.introductionFor(runId)`. Presentation (step 16) belongs to a later stage.
 
-The introduction should be brief dark-fantasy prose, usually second person, using soft memories/background rather than binding world-state facts.
+### Introduction flow and persistence
+
+1. If the run already has a stored introduction, it is returned unchanged. The provider is never called again, and reloading never changes the text.
+2. Otherwise the persisted character is loaded, and a `CharacterIntroductionContext` is built from its confirmed facts and the fixed lore (`content/lore.json`). The context holds the name, the five stats, the Fated value and band, weapons, passive, ability and items.
+3. The Character Introduction Narrator is called **with no database transaction open**. On any failure it uses the deterministic fallback introduction.
+4. The text is inserted if absent (`character_introduction`, Flyway V5). The table stores the text, its source (`AI` or `FALLBACK`) and the prompt version. AI and fallback introductions are stored the same way.
+5. If a concurrent request stored an introduction first, that stored introduction is returned, so every caller sees the same text.
+
+The introduction is brief dark-fantasy prose in the second person. It uses soft memories and background, never binding world-state facts, extra mechanics, items, powers, obligations or required places (see `AI_CONTRACTS.md`).

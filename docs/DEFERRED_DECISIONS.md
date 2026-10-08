@@ -58,7 +58,7 @@ Enemy stats, HP, defense DC, attack difficulty, anatomy for the four MVP enemies
 - Event mechanics and Fated variations.
 - Reward granting, including the Ashen Sigil from the Chapel Guardian.
 - Rare Fated starting modifications.
-- Fated consequences: use of the qualitative bands, rare events, enemy variants, rewards (only the numeric value is generated and stored).
+- Fated consequences: rare events, enemy variants, rewards (only the numeric value is generated and stored). The qualitative bands are used only as narration labels for the character introduction.
 - Weapon definition extensions: supported attack methods, suitability, tags, handedness, stat affinities, attack-form modifiers.
 - Runtime item/weapon instance ID format (distinct from static definition codes).
 
@@ -88,9 +88,12 @@ Enemy stats, HP, defense DC, attack difficulty, anatomy for the four MVP enemies
 
 ## Presentation and Contracts
 
+Decided in Stage 13 (see `AI_CONTRACTS.md`): the AI-facing alias format and how player-owned references are minted; the provider (OpenAI Java SDK behind `AiProvider`); the action document and its strict parsing; the one-repair policy; `ACTION_NOT_SUPPORTED` and `INTERPRETATION_FAILED`; the slash-command fallback; narration facts; attack cues; prompt versions; character-introduction persistence; and the Fated narration bands. Still deferred:
 - Run summary contents.
-- Narration facts: the reduced, narration-safe facts derived from a `ResolvedOutcome` for the narrator.
-- Entity/object ID format exposed to AI roles.
-- How opaque player-owned action references (weapons, abilities, items) are minted and presented to the Action Interpreter; the validation contract accepts any non-blank opaque references.
-- AI provider integration and structured-output schema/JSON codec for `ActionIntent`, including interpreter-side `ACTION_NOT_SUPPORTED` / `INTERPRETATION_FAILED` handling.
-- Action history persistence. `PlayerSceneView` currently exposes scene-local IDs and never UUIDs (no scene, exit-destination or run identities); the final AI-facing format is still undecided.
+- Action history and conversation memory: persisting player actions and decisions, and giving narrators any history. Each call is currently stateless.
+- When each narrator runs within a turn, and how an incoming attack and its narration are presented (turn orchestration).
+- Visible enemy condition in attack narration (no observable enemy condition model yet).
+- Narrator styles or tone settings, streaming output, prompt evaluation, and token or cost budgets.
+- A second AI provider implementation.
+- Expanding the lore beyond the fixed premise in `content/lore.json`.
+- Narrating the spoken words of `COMMUNICATE` steps (currently only the kind and addressee are narrated).

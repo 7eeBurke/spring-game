@@ -8,23 +8,24 @@ V1 has four AI jobs only:
 
 There are exactly four AI roles. Run-ending narration (victory outro, death) is a mode of the Outcome Narrator, not a fifth role.
 
-Everything mechanical remains in Java.
+Everything mechanical remains in Java. AI sits only at the edges of the pipeline: player text → **Action Interpreter** → Stage 10 validation → Stage 11 resolution → **Outcome Narrator**. Enemy decisions stay in Java; the **Enemy Attack Narrator** only describes the attack Java chose. The **Character Introduction Narrator** writes one persisted introduction per run.
+
+Every role has a deterministic fallback, so the game is fully playable without a model, a key or a network (see Fallbacks and Failure Handling). The provider and its settings are described in `ARCHITECTURE.md` and `README_SETUP.md`.
 
 ## 1. Action Interpreter
 
 Purpose: translate player text into structured `ActionIntent`.
 
-Input should include:
-- raw player text;
-- player-visible character state;
-- owned/equipped items;
-- known abilities;
-- `PlayerSceneView` only;
-- current combat context;
-- incoming attack when relevant;
-- allowed canonical enums and IDs.
+Input (exactly; see AI-Facing Context below):
+- the raw player text, as a JSON string value;
+- an `ActionInterpretationContext` built from `PlayerSceneView`, the player's own body and tool belt, and the visible cue of each incoming attack, using request-scoped aliases;
+- the allowed vocabulary, enforced by the structured-output schema;
+- the schema version.
 
-The player's text is untrusted data. Prompt-injection instructions inside player text must never override the interpreter contract.
+The player's text is untrusted data:
+- It travels only as a string value in the user message. The role's instructions travel separately and say explicitly that player input is data, never instructions.
+- A prompt injection cannot reach hidden state, because no hidden state is in the request.
+- It cannot submit mechanics, because the output document has no field for them.
 
 The interpreter may:
 - classify action type;
@@ -83,7 +84,7 @@ Specificity is `EXPLICIT` or `INFERRED` for every target that names something; o
 
 ### Player-owned references
 
-Weapons, abilities and items the player currently has are referred to by **opaque references** supplied with the interpreter's context, valid only for that action context. They are not definition codes and not persistent instance IDs; two references may name the same definition (two bandages). How references are minted and presented is decided with AI integration. A definition existing in the content catalogue does not make it usable; only a reference the player currently holds does.
+Weapons, abilities and items the player currently has are referred to by **opaque references** supplied with the interpreter's context, valid only for that action context. They are not definition codes and not persistent instance IDs; two references may name the same definition (two bandages). They are minted per request as aliases (see Safe Aliases): `weapon_1`, `item_2`, `ability_1` and so on, and the alias *is* the opaque reference. A definition existing in the content catalogue does not make it usable; only a reference the player currently holds does.
 
 ### Payloads
 
@@ -149,7 +150,7 @@ Error codes:
 
 `ACTION_PHYSICALLY_IMPOSSIBLE` is distinct from poor suitability: a strange but physically possible action passes validation and later receives poor suitability, down to `TERRIBLE`, which still rolls. Impossibility is declared only when known facts prove it. The player view currently holds only identity, zone placement and visibility, so the baseline plausibility policy proves nothing impossible; action resolution adds real rules through the plausibility seam.
 
-Earlier draft codes map as follows: `UNKNOWN_ENTITY_REFERENCE` and `TARGET_NOT_VISIBLE` are `UNKNOWN_SCENE_REFERENCE` (a separate "not visible" code would leak hidden state); `UNKNOWN_ITEM_REFERENCE`, `ITEM_NOT_OWNED` and `ABILITY_NOT_KNOWN` are `UNKNOWN_PLAYER_REFERENCE`; `AMBIGUOUS_REFERENCE` is `UNRESOLVED_REFERENCE`. `ABILITY_NO_USES`, `BODY_PART_NOT_PRESENT` and `ZONE_NOT_REACHABLE` need mechanics that do not exist yet. `ACTION_NOT_SUPPORTED` and `INTERPRETATION_FAILED` are interpreter-side outcomes handled with AI integration.
+Earlier draft codes map as follows: `UNKNOWN_ENTITY_REFERENCE` and `TARGET_NOT_VISIBLE` are `UNKNOWN_SCENE_REFERENCE` (a separate "not visible" code would leak hidden state); `UNKNOWN_ITEM_REFERENCE`, `ITEM_NOT_OWNED` and `ABILITY_NOT_KNOWN` are `UNKNOWN_PLAYER_REFERENCE`; `AMBIGUOUS_REFERENCE` is `UNRESOLVED_REFERENCE`. `ABILITY_NO_USES`, `BODY_PART_NOT_PRESENT` and `ZONE_NOT_REACHABLE` need mechanics that do not exist yet. `ACTION_NOT_SUPPORTED` and `INTERPRETATION_FAILED` are interpreter-side results, never validation codes or mechanical failures (see Interpretation Result).
 
 ### From ActionIntent to ResolvedOutcome
 
@@ -163,91 +164,228 @@ Only an intent that passes validation is resolved. Resolution is entirely Java a
 
 `MECHANICS_UNAVAILABLE` means a valid action whose mechanics are not designed yet. It is not a failure: nothing happened mechanically, so nothing may be narrated as happening. Spoken content from `COMMUNICATE` is not echoed into the outcome. A successful communication only confirms the words were said; it never confirms that anyone reacted.
 
+### Safe Aliases
+
+The model never sees a backend reference: no scene-local ID such as `acolyte_1`, no UUID, no exit destination and no backend incoming-attack reference. Each request mints typed aliases:
+
+- The format is `<kind>_<n>`, matching `^(zone|entity|object|hazard|exit|weapon|item|ability|attack)_[1-9][0-9]*$`.
+- Aliases are request-scoped, and deterministic for an identical situation:
+  - scene content is numbered in ascending order of local ID;
+  - weapons and items are numbered in tool-belt slot order;
+  - the ability is `ability_1`;
+  - incoming attacks are numbered in ascending order of their backend reference.
+- Aliases are unique within the request and typed: an `object_` alias can never resolve as an entity.
+
+A backend-only `AliasTable` maps them back:
+- scene aliases map to scene-local IDs;
+- player-owned aliases map to themselves, because they are the Stage 10 opaque references;
+- attack aliases map to the backend incoming-attack reference.
+
+A malformed alias, an alias of the wrong kind and an unknown alias are each rejected by name.
+
+### AI-Facing Context
+
+`ActionInterpretationContext` (schema version 1) contains only:
+- the current zone alias, the visible zones (alias, display name) and the visible connections between them (alias pairs);
+- visible entities, objects and hazards (alias, catalogue display name, zone alias) and known exits (alias, zone alias);
+- discovered fact codes;
+- the player's body (each part's severity) and the weapons, items and ability the player owns (alias, display name);
+- each incoming attack: its alias, the attacker's alias if visible, and its cue phrase (see Attack Cues).
+
+It never contains `SceneState`, hidden content, scene or run UUIDs, seeds, revisions, exit destinations, target combat profiles, player stats, enemy stats, HP, traits, behaviour weights or attack difficulty. A reflection test proves the type graph cannot reach them.
+
+### Action Document (schema version 1)
+
+The model answers with this document. A strict JSON-schema structured output enforces it, and Java then parses it again:
+
+```
+{ schemaVersion: 1, supported: bool, responseToAttack: attack alias | null, confidence: HIGH|MEDIUM|LOW,
+  steps: [ { relation, action, attack|null, defend|null, move|null, interact|null, observe|null,
+             useAbility|null, useItem|null, communicate|null } ],
+  unresolved: [ { stepNumber: int | null, phrase } ] }
+target      = { kind: ENTITY|OBJECT|HAZARD|ZONE|EXIT|SELF|NONE, alias: string|null, bodyPart: BodyPart|null, specificity }
+attack      = { weapon, method, template, target, approach, purpose }
+defend      = { method, evadeType, parryContact, cover: target }
+move        = { movementType, target, goal, approach }
+interact    = { kind, target, carried: { kind: WEAPON|ITEM, alias } | null, approach }
+observe     = { kind, target }
+useAbility  = { ability, target }      useItem = { item, target }
+communicate = { kind, content, target }
+```
+
+- Exactly the payload matching `action` is non-null.
+- Scene target kinds need an alias; `SELF` and `NONE` have none. Only `ENTITY` and `SELF` may name a body part.
+- `supported: false` means the input is not an in-world action, and the document has no steps.
+- Java numbers the steps `s1..sn`. Every value uses the Stage 10 vocabulary.
+- **There is no mechanical field**: no stat, suitability, DC, roll, success, damage, trauma, contact, effectiveness, HP, injury, condition or reward. A model that adds one fails strict parsing.
+- The schema is generated from the Stage 10 enums. Every object lists all of its properties as required and forbids additional ones; optional values are nullable.
+
+Strict parsing uses the project's strict JSON settings: unknown, missing and wrongly typed fields, unknown or wrongly cased enum values and trailing content all fail. An explicit `null` is accepted only in the nullable slots above. Provider schema enforcement never replaces this parsing or Stage 10 validation.
+
+### Interpretation Pipeline
+
+1. **Slash commands and blank input.** Input starting with `/` is a slash command (see Command Fallback) and never reaches a model. Blank input is `INTERPRETATION_FAILED (EMPTY_INPUT)`.
+2. **Everything else** goes through structured generation → strict parse → alias resolution → `ActionIntent` → Stage 10 validation.
+3. **Repair, at most once.** If parsing, alias resolution or construction fails, or validation reports errors, one repair request is sent. It carries the same instructions and context, the original player text, the previous output and model-safe problems:
+   - a description of a structure problem;
+   - an alias problem, naming only the model's own alias;
+   - a Stage 10 code with its step number and a fixed description of that code.
+
+   Raw validation messages contain backend references and are never forwarded. Repair reads no `SceneState`.
+4. **A second failure** is `INTERPRETATION_FAILED (INVALID_OUTPUT)`. Nothing is guessed.
+5. **A provider failure on either call** is `INTERPRETATION_FAILED (AI_UNAVAILABLE)`, with a hint to use slash commands. Provider failures are: disabled, not configured, timeout, authentication, rate limit, provider error, network, refusal and truncation.
+
+At most two model calls are made per player action, plus the provider client's own transport retries.
+
+### Interpretation Result
+
+- **`Interpreted(ValidatedActionIntent, source)`**: the intent has passed Stage 10 validation and goes straight to Stage 11.
+  - `source` is `AI`, `AI_REPAIRED` or `COMMAND`.
+  - The intent's `confidence` is the model's semantic confidence (`HIGH` for commands) and has no mechanical effect.
+- **`NotSupported`**: **ACTION_NOT_SUPPORTED**. The input is not an in-world action. This is not a mechanical failure.
+- **`Failed(reason, aiFailure, details)`**: **INTERPRETATION_FAILED**, with player-safe details. The reason is `EMPTY_INPUT`, `AI_UNAVAILABLE`, `INVALID_OUTPUT` or `INVALID_COMMAND`.
+
+### Command Fallback
+
+A deterministic, deliberately limited command mode. It uses the same aliases the context shows and never guesses. Each command produces an ordinary `ActionIntent` (confidence `HIGH`, approach `NORMAL`, specificity `EXPLICIT`) that still goes through Stage 10 validation. It resolves no mechanics. Verbs and enum words are case-insensitive.
+
+| Command | Produces |
+|---|---|
+| `/attack <target> <method> [template <T>] [part <BodyPart>] [with <weapon>] [purpose <P>]` | `ATTACK`. The weapon defaults to the only owned weapon; otherwise `with` is required. Purpose defaults to `DAMAGE`. The template defaults by method (no mechanical effect today): SLASH→HORIZONTAL_SWING, THRUST→THRUST, SMASH→OVERHEAD_STRIKE, HOOK→HOOK_AND_PULL, PROJECT→PROJECTED_ATTACK. **POMMEL_STRIKE has no default** and needs `template <T>` |
+| `/defend <method> [evade <EvadeType>] [parry <ParryContact>] [cover <object>] [against <attack>]` | `DEFEND`, responding to the only incoming attack. With several, `against` is required; with none, there is no response |
+| `/move <zone>` / `/move <exit>` | `REPOSITION` to the zone / `ADVANCE` through the exit |
+| `/hold` | `HOLD_POSITION` |
+| `/search`, `/listen`, `/watch [<alias>]`, `/inspect <alias>` | `OBSERVE` |
+| `/push`, `/pull`, `/break`, `/open`, `/close`, `/pickup`, `/jam`, `/ignite`, `/extinguish <alias>` | `INTERACT` |
+| `/drop <weapon or item>`, `/place <weapon or item> on <alias>` | `INTERACT` with the carried thing |
+| `/use <item> [on <alias> or self]`, `/ability <ability> [on <alias> or self]` | `USE_ITEM`, `USE_ABILITY` |
+| `/say`, `/ask`, `/threaten`, `/persuade`, `/deceive`, `/bargain [to <entity>] <text…>` or `… "<text>"` | `COMMUNICATE`. Unquoted content is the rest of the command and ends at `;` or `&&`. Double-quoted content is taken verbatim (`;` and `&&` inside it do not split commands, and `\"` is a literal quote); nothing may follow the closing quote |
+| `cmd ; cmd` | the second step is `THEN` |
+| `cmd && cmd` | the second step is `IF_PREVIOUS_SUCCEEDS` (`WHILE` is not available) |
+
+Commands are split at `;` and `&&` only outside double quotes. An unterminated or empty quotation is `INVALID_COMMAND`. Anything else is `INTERPRETATION_FAILED (INVALID_COMMAND)` with a short reason. A command that parses but fails Stage 10 validation is also `INVALID_COMMAND`, with the validation codes.
+
 ## 2. Outcome Narrator
 
-Purpose: convert confirmed `ResolvedOutcome` facts into atmospheric prose.
+Purpose: narrate confirmed backend truth after Stage 11. It never receives the `ActionIntent` and never guesses what happened.
 
-Narration modes:
-- action outcome — ordinary turn results;
-- run completion — short victory outro after the Chapel Guardian is defeated;
-- run death — narration of the run ending at HP <= 0.
+**Modes** (one role, never separate roles): `NORMAL`, `RUN_DEATH`, `RUN_VICTORY`. Java chooses the mode and supplies the terminal fact: `PlayerDied(attacker name?)` or `GuardianDefeated(name)`. The AI never decides that a run has ended. A mode without its matching terminal fact is rejected.
 
-Each mode receives an appropriate `NarrationContext` built from confirmed backend facts only, and each mode has a deterministic fallback.
+**Input:** `OutcomeNarrationContext(mode, current zone name, overall result, facts, terminal fact, untrustedPlayerWording?)`.
+- `OutcomeNarrationContextBuilder` receives the `ResolvedOutcome` and the `ValidatedActionIntent` that produced it (their step IDs must match). The narrator itself never receives the intent.
+- **`untrustedPlayerWording`** is an optional excerpt of what the player typed: at most 300 characters, labelled untrusted, a JSON string in the user message only. It is narrative context, never instructions and never a confirmed outcome.
 
-Input should be a reduced `NarrationContext` containing:
-- visible scene summary;
-- relevant player-visible state;
-- narration-safe outcome facts;
-- explicit non-events when needed to prevent embellishment.
+Facts are derived deterministically from each `StepOutcome`, in step order, using player-visible names only. Every fact carries an **`attempt`** (`AttemptedAction`), a Java summary of what the step tried to do. It has:
+- the action type;
+- the manner: method, defense method, movement type, or interaction, observation or communication kind;
+- the attack template, approach and purpose where they apply;
+- the target's kind (creature, object, hazard, zone, exit, self), visible name and body part;
+- what was used (a weapon, item or ability, by display name);
+- `spokenWords`.
 
-It may embellish:
-- sound;
-- smell;
-- texture;
-- pain;
-- motion;
-- mood;
-- metaphor.
+An attempt is never a confirmed outcome. **`spokenWords`** (the player's words, untrusted data) is present **only for a RESOLVED COMMUNICATE step**. A cancelled or unavailable communication never supplies words, and its fact cannot be built with them.
+- catalogue display names, numbered as "Hollow Acolyte 2" when several share a kind;
+- "something unseen" for an actor the player cannot see.
 
-It may not:
-- change outcome severity;
-- add damage/injury/conditions;
-- create interactable objects, exits, enemies, items or hazards;
-- reveal hidden content;
-- mutate game state.
+| Fact | Contents |
+|---|---|
+| `PlayerAttacked` | weapon name, target name, body part?, contact, HP damage, impact severity?, `noContact`, `contactWithoutDamage` |
+| `PlayerDefended` | attacker name, defense method, contact, HP damage, body part?, impact severity?, `avoided`, `contactWithoutDamage` |
+| `PlayerMoved` | from zone, to zone |
+| `PlayerStayed` | zone, attempted zone? (holding position, or a zone that could not be reached) |
+| `PlayerSpoke` | communication kind, addressee name?; the words are in its attempt's `spokenWords` |
+| `StepCancelled` | reason; what was attempted is in its attempt (never with spoken words) |
+| `StepHadNoEffect` | reason (a valid action with no mechanics yet); what was attempted is in its attempt (never with spoken words) |
+
+Non-events are explicit (no contact, contact without damage, staying put, a cancelled step, a step with no effect), so narration cannot imply they happened.
+
+**May:** add sensory texture, tone, pacing, mood and metaphor.
+
+**May not:**
+- invent an interactable object, enemy, exit, loot, hazard, item, wound, condition, state change, quest or reward;
+- change severity;
+- contradict a non-event.
+
+**Output** is plain text of up to 1200 characters. Narration is presentation only: it is never parsed back into mechanics or applied as state.
+
+**Fallback:** one factual sentence per fact. For example:
+- "Your Longsword lands a solid hit on the Hollow Acolyte in the head, dealing 6 damage."
+- "Your Longsword misses the Hollow Acolyte."
+- `You threaten the Hollow Acolyte: "Back away."` (resolved speech)
+- "You do not follow through with your attempt to threaten the Hollow Acolyte, and nothing is said."
+- "Nothing comes of your attempt to inspect the Fire."
+
+The run-ending modes add a closing line: "Your strength fails. The run ends here." or "The Chapel Guardian falls. The Hollow Chapel is still at last."
 
 ## 3. Enemy Attack Narrator
 
-The backend chooses the enemy action and computes attack properties.
-The narrator describes the incoming attack before the player responds.
+Java's enemy behaviour has already chosen the attack (`IncomingAttack`). The narrator only describes it, so the player can choose a defense. It does not choose the attack, its difficulty, damage, target part or success.
 
-Input should include required mechanical clues such as:
-- height;
-- trajectory;
-- width;
-- speed;
-- force;
-- reach;
-- commitment;
-- weapon/source;
-- visible enemy condition.
+### Attack Cues
 
-Narration must convey enough of those properties for the player to make an informed defensive decision.
-If the AI call fails, use deterministic template narration.
+Each `AttackTemplate` maps to one cue. Java always supplies the cue separately from the prose, so the player always sees it (see Output below).
+
+| Template | Cue | Phrase | Keywords |
+|---|---|---|---|
+| `THRUST` | `DIRECT_THRUST` | a straight thrust driven directly at you | thrust, lunge, straight |
+| `HORIZONTAL_SWING` | `HORIZONTAL_SWEEP` | a wide swing sweeping in from the side | sweep, swing, side |
+| `LOW_SWEEP` | `LOW_SWEEP` | a low sweep close to the ground | low |
+| `OVERHEAD_STRIKE` | `DESCENDING_STRIKE` | an overhead strike coming down from above | overhead, above, down |
+| `QUICK_SLASH` | `FAST_CUT` | a quick, fast cut | quick, fast, swift |
+| `HEAVY_SMASH` | `HEAVY_BLOW` | a heavy, crushing blow | heavy, crushing |
+| `HOOK_AND_PULL` | `HOOKING_PULL` | a hooking motion meant to catch and pull | hook |
+| `PROJECTED_ATTACK` | `PROJECTED` | a bolt hurled through the air toward you | projected, hurled, flies, bolt |
+
+No height, width, speed or force geometry is implied beyond the template; attack geometry is deferred.
+
+**Input:** `EnemyAttackNarrationContext(attacker name, weapon name, cue, cue phrase, required keywords)`. It has no difficulty, damage, target part, other options, weights or stats.
+
+**Output:** `EnemyAttackNarration(prose, cue, cueText)`.
+- **`cueText` is Java-generated and mandatory**, for example "Incoming: an overhead strike coming down from above." It is always available for display separately from the prose, and it cannot be replaced.
+- **The prose** may use its own wording; it is not required to repeat a cue keyword. Model prose is used if it is non-blank, at most 600 characters and states no numbers. Otherwise, or on any failure, the fallback prose is used: "The Hollow Acolyte comes at you with its Dagger: an overhead strike coming down from above."
+- Neither part can change the `IncomingAttack` or the cue.
 
 ## 4. Character Introduction Narrator
 
-Input includes only confirmed generated facts:
-- name;
-- stat tendencies (qualitative, not necessarily numeric in prose);
-- weapon;
-- passive;
-- ability;
-- tools;
-- qualitative Fated level;
-- authored world facts.
+**Input:** `CharacterIntroductionContext(name, the five stats, Fated value, Fated band, weapon names, passive, ability, item names, lore)`.
+- The Fated band is a narration-only label (see `CHARACTER_GENERATION.md`).
+- No probabilities, HP or identities are given.
+- The lore is the fixed premise in `content/lore.json` (see `CONTENT.md`).
 
-Allowed creativity:
-- vague former occupation;
-- fragmented memories;
-- emotional impressions;
-- thematic connection to confirmed equipment/passive/ability.
+**Allowed:** soft personal history, a vague former occupation, emotional impressions and fragmented memories.
 
-Forbidden:
-- additional abilities/items;
-- new mechanical bonuses;
-- mandatory future NPCs or relatives;
-- new factions/quests/locations unless supplied;
-- permanent world facts not created by backend.
+**Forbidden:**
+- stating stats, numbers or mechanical bonuses: strengths are described qualitatively, and the Fated number is not stated;
+- any item, weapon, power or ability beyond those given;
+- named people the character must find, owes or will meet;
+- quests, promises or obligations;
+- places the character must later visit;
+- extending the lore with new canon.
 
-Narrative flavour may be invented; persistent gameplay facts may not.
+**Output** is plain text of up to 2000 characters.
 
-## Fallbacks
+**Fallback:** the lore lines, then the name, the strongest and weakest stat, the weapons and items, the passive and ability, and the Fated band's phrase.
 
-Every AI role must fail safely:
-- interpreter: strict retry/fallback, then request rephrase only if needed;
-- outcome narrator: deterministic narration from narration facts, including deterministic victory and death text for run-ending modes;
-- enemy attack narrator: deterministic property template;
-- character introduction: short deterministic intro.
+The introduction is generated once per run and persisted; reloading returns the stored text (see `CHARACTER_GENERATION.md`).
 
-The game must remain mechanically playable without a live LLM.
+## Prompts
+
+- **Location:** each role's instructions are a versioned classpath resource, `src/main/resources/ai/prompts/<role>-v<version>.txt`. The Outcome Narrator is at version 2 (attempts, spoken words and player wording); the other roles are at version 1. Superseded prompt files are kept for history; only the current version is loaded.
+- **Versions** are operational metadata for prompt evolution, separate from rules, content and schema versions. The persisted introduction records the prompt version that produced it.
+- **Prompts are application configuration**, not game content, and are never stored in the database.
+- **Request shape:** each request sends the role's instructions separately from a single JSON user message. Player text, when present, is only a string value inside that message.
+
+## Fallbacks and Failure Handling
+
+| Role | On provider failure or unusable output |
+|---|---|
+| Action Interpreter | one repair for unusable output, then `INTERPRETATION_FAILED`. A provider failure is `INTERPRETATION_FAILED (AI_UNAVAILABLE)`. Slash commands always work |
+| Outcome Narrator | deterministic factual narration |
+| Enemy Attack Narrator | deterministic prose, also used for blank, overlong or numeric prose; the Java `cueText` is always present |
+| Character Introduction Narrator | deterministic introduction, persisted like AI text |
+
+Failures are classified as `DISABLED`, `NOT_CONFIGURED`, `TIMEOUT`, `AUTHENTICATION`, `RATE_LIMITED`, `PROVIDER_ERROR`, `NETWORK`, `REFUSED`, `TRUNCATED` or `MALFORMED_RESPONSE`, and returned with the result; they are never silently treated as success. No game state ever depends on partially parsed model output, and narration never mutates state.
+
+Each call writes one log line with the role, prompt version, model, latency, attempts, outcome and the token usage the provider reported (input, cached input, output and reasoning tokens; the interpreter sums its attempts). Usage is operational metadata only: logged, never persisted, never game state. Keys, headers, player text, prompts, model output and game state are never logged, and model reasoning is never requested or stored.
+
+The game remains mechanically playable without a live model.

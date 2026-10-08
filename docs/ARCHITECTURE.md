@@ -48,11 +48,12 @@ The AI may normalize language but may not output rolls, DCs, damage, trauma, suc
 ### Action Boundary
 
 ```
-player text → (future) Action Interpreter → ActionIntent
+player text → Action Interpreter (AI with aliases, or a /command) → ActionIntent
             → ActionValidator (PlayerSceneView + owned references + known incoming attacks)
             → ValidatedActionIntent
             → ActionEngine (ActionResolutionContext + caller's RandomGenerator) → ResolvedOutcome
-            → (later) effect application → persistence → narration
+            → Outcome Narrator (confirmed facts only)
+            → (later) effect application → persistence
 ```
 
 - `action` holds the contract: `ActionIntent`, steps, the sealed payloads and targets, and the vocabulary enums. The action type is derived from the payload.
@@ -166,10 +167,78 @@ Builders and behaviour take an `EnemyCombatant`. Its constructor rejects, as a p
 
 There is no turn loop: ordering enemies, prompting the player and applying effects come later. The caller supplies recent choices, because action history is not persisted.
 
-## Narration Boundary
+## AI Boundary
 
-The narrator should receive a reduced `NarrationContext`, not the full internal object graph.
-It may dramatize confirmed facts but may not add consequences or interactable objects.
+AI sits at the edges of the deterministic pipeline and never inside it:
+
+```
+player text → ActionInterpreter (AI or /command) → ValidatedActionIntent → ActionEngine → ResolvedOutcome
+            → OutcomeNarrationContextBuilder → OutcomeNarrator → presentation text
+EnemyBehavior → EnemyDecision.Attack → IncomingAttack → EnemyAttackNarrator → presentation text
+GeneratedCharacter → persisted run → CharacterIntroductionService → CharacterIntroductionNarrator → persisted introduction
+```
+
+`ActionValidator`, `ActionEngine`, world generation and enemy behaviour are unchanged and know nothing about AI. Narration is never parsed back into mechanics or applied as state. The contracts are in `AI_CONTRACTS.md`.
+
+### Packages
+
+- `ai`: the provider-neutral core, pure Java.
+  - `AiProvider` has two operations: `generateStructured` and `generateText`.
+  - Request and response records, with `AiResponse` either `Success` or a classified `Failure`.
+  - `DisabledAiProvider`, used when AI is off or not configured.
+  - `PromptLibrary`, holding the versioned classpath prompts.
+  - `AiRoleSettings`, plus `AiJson` and `AiCallLog`.
+- `ai.interpreter`: the Action Interpreter, pure Java.
+  - `InterpretationContextBuilder` builds the AI-facing `ActionInterpretationContext`, the backend-only `AliasTable` and the Stage 10 `ActionValidationContext`.
+  - The strict `ActionDocument`, its generated schema, its parser and its alias mapper.
+  - `ActionInterpreter`, which runs the bounded repair loop.
+  - `CommandInterpreter`, the slash-command fallback.
+  - `ActionInterpretationResult`.
+- `ai.narration`: the three narrators and their deterministic fallbacks, pure Java.
+  - The narration facts, each with a Java `AttemptedAction` summary, and their contexts.
+  - The attack cues; `EnemyAttackNarration` always carries the Java `cueText` separately from the prose.
+  - `LoreCatalog`, loaded from `content/lore.json`.
+- `ai.openai`: `OpenAiProvider`, the only class that imports the vendor SDK.
+- `config.AiConfiguration` and `AiProperties`: choose the provider and wire the roles. This is the only Spring involvement.
+- `persistence.IntroductionStore` and `run.introduction.CharacterIntroductionService`: the persisted introduction.
+
+### Provider Adapter
+
+- **SDK:** the OpenAI Java SDK (`com.openai:openai-java` 4.78.0, which brings Jackson 2, OkHttp and the Kotlin stdlib and coexists with our Jackson 3).
+- **Request shape:** it uses the Responses API. The role prompt goes in `instructions` and the JSON input is the single user message, never concatenated. It sets `max_output_tokens`, sends a temperature only when configured, and uses `store=false`.
+- **Structured output:** the interpreter's structured calls use a strict `json_schema` text format.
+- **Usage:** reported token usage (input, cached input, output, reasoning) is returned as an optional `AiUsage` and logged by the role; it is never persisted.
+- **Failures:**
+  - refusals, incomplete responses and empty output are failures;
+  - SDK exceptions map to `AiFailureKind`, carrying only an HTTP status, never the key, headers or body.
+- **Replacing the provider** means writing one new `AiProvider` implementation and changing the configuration; no game type imports the SDK.
+
+### Configuration
+
+All `game.ai.*` settings are optional (see `README_SETUP.md`):
+- AI is off by default.
+- When it is enabled without a key or model, the provider is a `DisabledAiProvider` (`NOT_CONFIGURED`) and one warning names the missing setting; its value is never printed.
+- Startup never fails because of AI, and tests never call a real provider.
+
+### Safe Contexts
+
+Each role receives its own immutable context, built only from player-visible or confirmed data:
+- the interpreter context from `PlayerSceneView`, the player's body and tool belt, and the incoming attacks' cues;
+- the outcome context from `ResolvedOutcome` and visible names;
+- the attack context from the chosen `IncomingAttack`'s template, the attacker's visible name and the weapon name;
+- the introduction context from the generated character and the lore.
+
+Reflection tests prove that the interpreter and attack contexts cannot reach `SceneState`, UUIDs, combat profiles, enemy state or stats.
+
+### Character Introduction Persistence
+
+`CharacterIntroductionService` is deliberately not transactional:
+1. It reads any stored introduction in a short read-only transaction.
+2. It loads the character, which is another short transaction.
+3. It calls the narrator with no transaction open.
+4. It stores the result with `INSERT … ON CONFLICT (run_id) DO NOTHING`, and returns whichever row was committed first.
+
+Once stored, the introduction is returned as is and the provider is never called again for that run.
 
 ## Package Architecture
 
@@ -191,8 +260,12 @@ Feature-oriented packages under the base package `com.leeburke.springgame`, grow
   - `world.generation` — deterministic world generation: `RunWorldGenerator`, topology, archetype selection, scene contents, `CompleteRegionValidator`, and the in-memory aggregates `GeneratedRegion` and `GeneratedRunWorld` (pure Java, no Spring)
 - `run` — run lifecycle and the `GameRun` read model
   - `run.initialization` — the in-memory starting state of a new run (world plus enemies) and its generator
+  - `run.introduction` — the run's one persisted character introduction
 - `persistence` — JPA entities, entity/domain mapping, the scene-state JSON codec and the persistence facades (`GameRunStore`, `WorldStore`)
-- `ai` — AI role adapters and deterministic fallbacks
+- `ai` — the provider-neutral AI boundary (pure Java)
+  - `ai.interpreter` — the Action Interpreter, aliases, the strict action document and the slash-command fallback
+  - `ai.narration` — the Outcome, Enemy Attack and Character Introduction narrators with their fallbacks
+  - `ai.openai` — the OpenAI adapter, the only code that imports the vendor SDK
 - `api` — HTTP controllers and request/response DTOs
 
 Packages are created only when a stage needs them.
@@ -217,7 +290,7 @@ Action interpretation and AI roles receive `PlayerSceneView`, never authoritativ
 - React + TypeScript + Vite for the frontend (later stage)
 - Lombok is optional
 
-The AI provider is deliberately unspecified until the AI integration stage. Do not add an AI provider SDK before then.
+- OpenAI Java SDK (`com.openai:openai-java` 4.78.0) behind the provider-neutral `AiProvider` interface, used only in `ai.openai`. It brings Jackson 2 (version managed by the Spring Boot parent), OkHttp and the Kotlin stdlib.
 
 ## Persistence Strategy
 
@@ -283,6 +356,10 @@ Composite foreign keys on `(id, run_id)` ensure a scene can only reference a reg
 - `enemy_instance` — keyed by `(scene_id, entity_local_id)`, with a foreign key to `scene_instance`. It holds the definition code, the five stats (3–10), `max_hp` (at least 1), `current_hp` (0 to max) and the weapon code. That the entity exists in the scene's JSONB state is checked by the application.
 - `enemy_body_part` — one row per body part of an enemy (part and severity by enum name), keyed by `(scene_id, entity_local_id, body_part)`.
 - There are no tables for enemy definitions, anatomies, traits, behaviour or attack options, which are static content, and none for action history. Loading checks rows against `EnemyCatalog`; an unknown definition or weapon, or a body that does not match its anatomy, raises `PersistedStateException`.
+
+### Current Tables (V5)
+
+- `character_introduction` — keyed by `run_id`, with a foreign key to `player_character`. It holds the finalised introduction text (non-blank), its `source` (`AI` or `FALLBACK`) and the `prompt_version` that produced it. One row per run, written once with `INSERT … ON CONFLICT DO NOTHING`. No model metadata, provider request, reasoning or secret is stored.
 
 ### Static Content References
 

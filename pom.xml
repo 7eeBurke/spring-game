@@ -16,6 +16,8 @@
 	<packaging>jar</packaging>
 	<properties>
 		<java.version>21</java.version>
+		<!-- The real-provider smoke test is opt-in: -Dgroups=ai-smoke -DexcludedGroups=none -->
+		<excludedGroups>ai-smoke</excludedGroups>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -55,6 +57,12 @@
 			<scope>runtime</scope>
 		</dependency>
 
+		<!-- Official OpenAI Java SDK, used only by the provider adapter in ai.openai (brings Jackson 2, OkHttp, Kotlin). -->
+		<dependency>
+			<groupId>com.openai</groupId>
+			<artifactId>openai-java</artifactId>
+			<version>4.78.0</version>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-validation-test</artifactId>
