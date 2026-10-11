@@ -37,8 +37,14 @@ public final class ResolutionContextFactory {
 	}
 
 	public InterpretationSetup interpretation(GameSnapshot snapshot) {
+		return interpretation(snapshot, Map.of());
+	}
+
+	/** @param exitLabels where each known exit leads, as the player knows it */
+	public InterpretationSetup interpretation(GameSnapshot snapshot, Map<String, String> exitLabels) {
 		List<IncomingAttack> incoming = snapshot.pending().map(p -> List.of(p.attack())).orElse(List.of());
-		return interpretation.build(snapshot.view(), snapshot.player(), incoming, snapshot.fallenVisibleEnemyIds());
+		return interpretation.build(snapshot.view(), snapshot.player(), incoming, snapshot.fallenVisibleEnemyIds(), exitLabels,
+				snapshot.scene().definitionCode());
 	}
 
 	public ActionResolutionContext resolution(GameSnapshot snapshot, ValidatedActionIntent validated) {

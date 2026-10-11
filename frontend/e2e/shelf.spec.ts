@@ -5,6 +5,7 @@ const RUN_ID = '3f2b8c1e-7d4a-4c6b-9e2f-1a2b3c4d5e6f';
 const view = {
   runId: RUN_ID, status: 'ACTIVE', stateVersion: 0, awaiting: 'ACTION', finalizing: false,
   introduction: { text: 'The flame gutters, and you wake at the Last Lantern.', source: 'AI' },
+  objective: 'Follow Chapel Road to the Hollow Chapel, and discover what guards its depths.',
   character: {
     name: 'Wren', hp: 24, maxHp: 24, stats: { MIGHT: 5, AGILITY: 8 }, fated: 1, fatedBand: 'TOUCHED',
     body: [{ part: 'HEAD', severity: 'HEALTHY' }], weapons: [{ alias: 'weapon_1', name: 'Longsword' }],
@@ -25,7 +26,7 @@ test('creates a tale, survives a lost response and resumes after reload', async 
   });
   await page.route(`**/api/v1/runs/${RUN_ID}/chronicle*`, (route) => route.fulfill({ json: {
     runId: RUN_ID, status: 'ACTIVE', latestTurnNumber: 0, turns: [], nextBefore: null,
-    opening: { introduction: view.introduction, scene: 'The Last Lantern', zone: 'Lantern Hearth' },
+    opening: { introduction: view.introduction, objective: view.objective, scene: 'The Last Lantern', zone: 'Lantern Hearth' },
   } }));
   await page.route(`**/api/v1/runs/${RUN_ID}`, (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(view) }));

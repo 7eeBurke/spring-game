@@ -64,7 +64,8 @@ public final class CommandInterpreter {
 	private static final Map<String, InteractionKind> INTERACTIONS = Map.of(
 			"push", InteractionKind.PUSH, "pull", InteractionKind.PULL, "break", InteractionKind.BREAK,
 			"open", InteractionKind.OPEN, "close", InteractionKind.CLOSE, "pickup", InteractionKind.PICK_UP,
-			"jam", InteractionKind.JAM, "ignite", InteractionKind.IGNITE, "extinguish", InteractionKind.EXTINGUISH);
+			"take", InteractionKind.PICK_UP, "jam", InteractionKind.JAM, "ignite", InteractionKind.IGNITE,
+			"extinguish", InteractionKind.EXTINGUISH);
 
 	private static final TargetSpecificity EXPLICIT = TargetSpecificity.EXPLICIT;
 
@@ -246,7 +247,11 @@ public final class CommandInterpreter {
 			case EXIT -> new ActionPayload.MovePayload(MovementType.ADVANCE,
 					new ActionTarget.ExitTarget(context.aliases.resolve(AliasKind.EXIT, alias), EXPLICIT), RelativeGoal.NONE,
 					ActionApproach.NORMAL);
-			default -> throw new CommandException("/move needs a zone or exit alias");
+			// Toward an object: one step closer along known passages (a command never walks further).
+			case OBJECT -> new ActionPayload.MovePayload(MovementType.CLOSE_DISTANCE,
+					new ActionTarget.ObjectTarget(context.aliases.resolve(AliasKind.OBJECT, alias), EXPLICIT), RelativeGoal.NONE,
+					ActionApproach.NORMAL);
+			default -> throw new CommandException("/move needs a zone, exit or object alias");
 		};
 	}
 

@@ -125,3 +125,9 @@
 .here {
   color: var(--color-gold);
 }
+
+.objective {
+  font-family: var(--font-display);
+  font-style: italic;
+  color: var(--color-gold);
+}

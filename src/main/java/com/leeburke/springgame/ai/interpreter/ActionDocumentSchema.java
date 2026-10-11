@@ -32,7 +32,8 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * The JSON schema of {@link ActionDocument}, generated from the Stage 10 enums so the two cannot
  * drift. It uses only the strict structured-output subset: every property is required, objects
- * forbid additional properties, and optional values are nullable unions.
+ * forbid additional properties, and optional values are nullable unions. The shared target shape is
+ * defined once under {@code $defs} and referenced; {@code schemaVersion} is pinned to its one value.
  */
 public final class ActionDocumentSchema {
 
@@ -66,24 +67,24 @@ public final class ActionDocumentSchema {
 						+ "specificity: EXPLICIT}. No target -> {kind: NONE, alias: null, bodyPart: null, specificity: UNSPECIFIED}.");
 
 		ObjectNode attack = object(map("weapon", type("string"), "method", enumOf(WeaponMethod.values()),
-				"template", enumOf(AttackTemplate.values()), "target", target.deepCopy(),
+				"template", enumOf(AttackTemplate.values()), "target", ref("target"),
 				"approach", enumOf(ActionApproach.values()), "purpose", enumOf(AttackPurpose.values())),
 				"weapon", "method", "template", "target", "approach", "purpose");
 		ObjectNode defend = object(map("method", enumOf(DefenseMethod.values()), "evadeType", enumOf(EvadeType.values()),
-				"parryContact", enumOf(ParryContact.values()), "cover", target.deepCopy()),
+				"parryContact", enumOf(ParryContact.values()), "cover", ref("target")),
 				"method", "evadeType", "parryContact", "cover");
-		ObjectNode move = object(map("movementType", enumOf(MovementType.values()), "target", target.deepCopy(),
+		ObjectNode move = object(map("movementType", enumOf(MovementType.values()), "target", ref("target"),
 				"goal", enumOf(RelativeGoal.values()), "approach", enumOf(ActionApproach.values())),
 				"movementType", "target", "goal", "approach");
 		ObjectNode carried = object(map("kind", enumOf(CarriedKind.values()), "alias", type("string")), "kind", "alias");
-		ObjectNode interact = object(map("kind", enumOf(InteractionKind.values()), "target", target.deepCopy(),
+		ObjectNode interact = object(map("kind", enumOf(InteractionKind.values()), "target", ref("target"),
 				"carried", nullableObject(carried), "approach", enumOf(ActionApproach.values())),
 				"kind", "target", "carried", "approach");
-		ObjectNode observe = object(map("kind", enumOf(ObservationKind.values()), "target", target.deepCopy()), "kind", "target");
-		ObjectNode useAbility = object(map("ability", type("string"), "target", target.deepCopy()), "ability", "target");
-		ObjectNode useItem = object(map("item", type("string"), "target", target.deepCopy()), "item", "target");
+		ObjectNode observe = object(map("kind", enumOf(ObservationKind.values()), "target", ref("target")), "kind", "target");
+		ObjectNode useAbility = object(map("ability", type("string"), "target", ref("target")), "ability", "target");
+		ObjectNode useItem = object(map("item", type("string"), "target", ref("target")), "item", "target");
 		ObjectNode communicate = object(map("kind", enumOf(CommunicationKind.values()), "content", type("string"),
-				"target", target.deepCopy()), "kind", "content", "target");
+				"target", ref("target")), "kind", "content", "target");
 
 		ObjectNode step = object(map("relation", enumOf(StepRelation.values()), "action", enumOf(ActionType.values()),
 				"attack", nullableObject(attack), "defend", nullableObject(defend), "move", nullableObject(move),
@@ -93,10 +94,26 @@ public final class ActionDocumentSchema {
 				"relation", "action", "attack", "defend", "move", "interact", "observe", "useAbility", "useItem", "communicate");
 		ObjectNode unresolved = object(map("stepNumber", nullable("integer"), "phrase", type("string")), "stepNumber", "phrase");
 
-		return object(map("schemaVersion", type("integer"), "supported", type("boolean"),
+		ObjectNode root = object(map("schemaVersion", pinned(ActionDocument.CURRENT_SCHEMA_VERSION), "supported", type("boolean"),
 				"responseToAttack", nullable("string"), "confidence", enumOf(InterpretationConfidence.values()),
 				"steps", array(step), "unresolved", array(unresolved)),
 				"schemaVersion", "supported", "responseToAttack", "confidence", "steps", "unresolved");
+		// The target is defined once and referenced, rather than repeated (with its guidance) in every payload.
+		root.putObject("$defs").set("target", target);
+		return root;
+	}
+
+	private static ObjectNode ref(String definition) {
+		ObjectNode node = MAPPER.createObjectNode();
+		node.put("$ref", "#/$defs/" + definition);
+		return node;
+	}
+
+	/** An integer that can only be this value: the document's schema version is never the model's choice. */
+	private static ObjectNode pinned(int value) {
+		ObjectNode node = type("integer");
+		node.putArray("enum").add(value);
+		return node;
 	}
 
 	private static Map<String, JsonNode> map(Object... keysAndValues) {

@@ -27,19 +27,31 @@ The preview shows the story screen with hand-written **sample** text. It never c
 
 The `npm run e2e` run saves screenshots to `test-results/screens/`.
 
+## Playing (Stage 15D)
+
+You write an action and send it. The server interprets and resolves it, and the confirmed narration is revealed in the story.
+
+- **Keys:** on a desktop keyboard, Enter sends and Shift+Enter adds a new line. On a phone, Enter adds a new line and the send button sends.
+- **Outbox:** every action is saved on the device, under its own idempotency key, before it is sent (`src/storage/outbox.ts`). Retries and recovery after a reload always resend that exact record, so an action is never applied twice.
+- **One sender per tab:** only one tab at a time may send for a run (`src/play/turnLock.ts`: Web Locks, or a localStorage lease where Web Locks are unavailable).
+- **Retry timings:** set in `src/play/turnOutcome.ts` (`retryTiming`).
+
 ## Real-backend check (opt-in)
 
-`e2e/real-backend.spec.ts` plays 25 slash-command turns against a local Spring Boot server with AI
-disabled. It then restores the whole chronicle in the browser from PostgreSQL. It is skipped unless
-`E2E_REAL_API=1`; the commands are in the spec's header comment. The turn-limit override in those commands is a test-only
-command-line argument; production defaults are unchanged.
+Two specs run against a local Spring Boot server with AI disabled:
+- **`e2e/real-backend.spec.ts`** restores a 25-turn chronicle from PostgreSQL.
+- **`e2e/real-play.spec.ts`** plays through the UI: commands, a refused free-text action, an attack, a defense and a counter.
+
+Both are skipped unless `E2E_REAL_API=1`; the commands are in the specs' header comments. Run them with `--workers=1`. The turn-limit override in those commands is a test-only command-line argument; production defaults are unchanged.
+
+The real-OpenAI play test runs only with `E2E_REAL_AI=1` and a server using real AI. It spends a few small model calls.
 
 ## Playing a real run
 
 1. Start Spring Boot with an invite code. See `../README_SETUP.md`, "Play Through the API".
 2. Open http://localhost:5173.
 
-Creating, resuming and recovering tales work, and the story screen restores the full chronicle (Stage 15C). Playing turns from the screen comes in 15D.
+Creating, resuming and recovering tales work. The story screen restores the full chronicle, and turns are played from it.
 
 ## Where things live
 

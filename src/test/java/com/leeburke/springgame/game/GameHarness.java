@@ -82,7 +82,13 @@ final class GameHarness {
 		PlayerCharacterState hurt = new PlayerCharacterState(player.name(), player.stats(), player.fated(), player.maxHp(),
 				Math.min(playerHp, player.maxHp()), player.body(), player.passive(), player.ability(), player.toolBelt());
 		return new GameSnapshot(new RunSession(RUN, RunStatus.ACTIVE, 0, 0, Optional.empty()), seed, hurt,
-				new PlayerLocation(scene.id(), zone), scene, enemies, pending);
+				new PlayerLocation(scene.id(), zone), known(scene), enemies, pending);
+	}
+
+	/** The scene with its whole layout known, as these rules tests assume (what a new arrival reveals is tested elsewhere). */
+	static SceneInstance known(SceneInstance scene) {
+		return new SceneInstance(scene.id(), scene.runId(), scene.definitionCode(), scene.placement(), scene.discovered(),
+				scene.revision(), scene.state().allKnown());
 	}
 
 	GameSnapshot snapshot(SceneInstance scene) {
@@ -98,6 +104,11 @@ final class GameHarness {
 
 	String alias(GameSnapshot snapshot, String entityId) {
 		return contexts.interpretation(snapshot).aliases().aliasOf(AliasKind.ENTITY, entityId).orElseThrow();
+	}
+
+	/** The view alias of a visible zone. */
+	String zoneAlias(GameSnapshot snapshot, String zoneId) {
+		return contexts.interpretation(snapshot).aliases().aliasOf(AliasKind.ZONE, zoneId).orElseThrow();
 	}
 
 	/** Interprets a slash command against the snapshot; it must be valid. */

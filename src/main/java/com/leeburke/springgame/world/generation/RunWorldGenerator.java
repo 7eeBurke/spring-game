@@ -56,7 +56,7 @@ public final class RunWorldGenerator {
 		this.hub = catalog.findFixedScene(HUB_CODE)
 				.orElseThrow(() -> new IllegalArgumentException("World content has no fixed scene " + HUB_CODE));
 		this.region = catalog.findRegion(hub.exit().destinationRegion()).orElseThrow();
-		this.validator = validator != null ? validator : new CompleteRegionValidator(region);
+		this.validator = validator != null ? validator : new CompleteRegionValidator(region, catalog::findArchetype);
 	}
 
 	/**
@@ -79,6 +79,24 @@ public final class RunWorldGenerator {
 				+ MAX_ATTEMPTS + " attempts; last problems: " + lastProblems);
 	}
 
+	/** Each scene's number of passages from the region's first scene (index 0), over the topology. */
+	static int[] depths(List<List<Integer>> neighbours) {
+		int[] depth = new int[neighbours.size()];
+		java.util.Arrays.fill(depth, Integer.MAX_VALUE);
+		depth[0] = 0;
+		java.util.ArrayDeque<Integer> queue = new java.util.ArrayDeque<>(List.of(0));
+		while (!queue.isEmpty()) {
+			int scene = queue.poll();
+			for (int next : neighbours.get(scene)) {
+				if (depth[next] == Integer.MAX_VALUE) {
+					depth[next] = depth[scene] + 1;
+					queue.add(next);
+				}
+			}
+		}
+		return depth;
+	}
+
 	/** One deterministic generation attempt (no validation). */
 	GeneratedRegion generateRegion(UUID runId, long runSeed, GenerationContextSnapshot context, int attempt, UUID hubId) {
 		long attemptSeed = WorldRandom.attemptSeed(runSeed, attempt);
@@ -91,7 +109,8 @@ public final class RunWorldGenerator {
 		Map<String, Integer> usage = new HashMap<>();
 		for (int i = 0; i < bossIndex; i++) {
 			if (i == 0) {
-				archetypes[i] = ArchetypeSelector.pickOpening(region.normalArchetypes(), context, rng);
+				// Only a place that can lie just behind the region's exterior doors may open it.
+				archetypes[i] = ArchetypeSelector.pickOpening(region.openingArchetypes(), context, rng);
 			} else {
 				Set<String> neighbourArchetypes = new HashSet<>();
 				for (int j : neighbours.get(i)) {
@@ -113,20 +132,29 @@ public final class RunWorldGenerator {
 
 		List<SceneState> states = new ArrayList<>();
 		long[] sceneSeeds = new long[topology.sceneCount()];
+		int[] depth = depths(neighbours);
 		for (int i = 0; i < topology.sceneCount(); i++) {
 			sceneSeeds[i] = WorldRandom.sceneSeed(attemptSeed, i);
 			List<ExitSpec> exits = new ArrayList<>();
 			List<Integer> linked = neighbours.get(i);
 			for (int k = 0; k < linked.size(); k++) {
-				exits.add(new ExitSpec("exit_" + (k + 1), sceneIds.get(linked.get(k))));
+				// A way back toward the region's first scene is a way in: it leaves from the entrance.
+				exits.add(new ExitSpec("exit_" + (k + 1), sceneIds.get(linked.get(k)), depth[linked.get(k)] < depth[i]));
 			}
 			if (i == 0) {
-				exits.add(new ExitSpec(HUB_RETURN_EXIT_ID, hubId));
+				exits.add(new ExitSpec(HUB_RETURN_EXIT_ID, hubId, true));
 			}
 			SceneArchetypeDefinition archetype = catalog.findArchetype(archetypes[i]).orElseThrow();
 			states.add(SceneContentGenerator.generate(archetype, WorldRandom.create(sceneSeeds[i]), exits));
 		}
 		states = SceneContentGenerator.dropDuplicateEvents(states);
+		// Containers and the first find come from their own streams: the structure above is unchanged by them.
+		List<SceneState> furnished = new ArrayList<>();
+		for (int i = 0; i < states.size(); i++) {
+			furnished.add(SceneFurnisher.furnish(states.get(i), sceneSeeds[i], catalog.containers(),
+					i == 0 ? java.util.Optional.of(HUB_RETURN_EXIT_ID) : java.util.Optional.empty()));
+		}
+		states = furnished;
 
 		List<SceneInstance> scenes = new ArrayList<>();
 		for (int i = 0; i < topology.sceneCount(); i++) {
@@ -144,7 +172,7 @@ public final class RunWorldGenerator {
 	private SceneInstance buildHub(UUID hubId, UUID runId, UUID entrySceneId) {
 		SceneState state = new SceneState(hub.zones(), hub.connections(), List.of(), List.of(), List.of(),
 				List.of(new SceneExit(hub.exit().id(), hub.exit().zoneId(), entrySceneId)), List.of(), List.of(),
-				List.of(), List.of());
+				List.of(), List.of()).generated(List.of());
 		return new SceneInstance(hubId, runId, hub.code(), new ScenePlacement.Hub(), true, 0, state);
 	}
 }

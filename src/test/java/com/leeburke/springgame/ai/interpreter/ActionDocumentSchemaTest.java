@@ -50,6 +50,24 @@ class ActionDocumentSchemaTest {
 	}
 
 	@Test
+	void theTargetIsDefinedOnceAndReferencedEverywhere() {
+		String json = ActionDocumentSchema.json();
+		JsonNode target = schema.get("$defs").get("target");
+
+		assertThat(target.get("properties").propertyNames()).containsExactly("kind", "alias", "bodyPart", "specificity");
+		assertThat(json.split("\"#/\\$defs/target\"", -1)).hasSize(9); // attack, cover, move, interact, observe, ability, item, speech
+		assertThat(json.split("UNSPECIFIED is only for kind NONE", -1)).hasSize(2); // its guidance appears once
+		JsonNode move = schema.get("properties").get("steps").get("items").get("properties").get("move").get("anyOf").get(0);
+		assertThat(move.get("properties").get("target").get("$ref").asString()).isEqualTo("#/$defs/target");
+	}
+
+	@Test
+	void theSchemaStaysSmall() {
+		// It is sent with every interpretation; it was about 14,700 characters with the target repeated, and is about 5,600 now.
+		assertThat(ActionDocumentSchema.json().length()).isLessThan(7_000);
+	}
+
+	@Test
 	void noPropertyCarriesMechanics() {
 		Set<String> names = new HashSet<>();
 		collectPropertyNames(schema, names);

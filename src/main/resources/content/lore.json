@@ -5,5 +5,7 @@
     "Time and reality have begun to distort.",
     "You are a Bound Soul.",
     "The Last Lantern is a small refuge on the road to the Hollow Chapel."
-  ]
+  ],
+  "objective": "Follow Chapel Road to the Hollow Chapel, and discover what guards its depths.",
+  "objectiveInside": "Find a way deeper into the Hollow Chapel, and discover what guards its depths."
 }

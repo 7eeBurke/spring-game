@@ -130,9 +130,9 @@ class PlayerSceneViewProjectorTest {
 			assertThat(type.getPackageName()).as("%s must be a view type", type).isEqualTo("com.leeburke.springgame.world.view");
 			for (RecordComponent component : type.getRecordComponents()) {
 				for (Class<?> used : typesIn(component.getGenericType())) {
-					// Only text, lists, and other view records: no UUID, long/Long, enum or authoritative type.
+					// Only text, lists, plain flags and other view records: no UUID, long/Long, enum or authoritative type.
 					boolean viewRecord = used.isRecord() && used.getPackageName().equals("com.leeburke.springgame.world.view");
-					assertThat(used == String.class || used == List.class || viewRecord)
+					assertThat(used == String.class || used == List.class || used == boolean.class || viewRecord)
 							.as("%s.%s uses %s", type.getSimpleName(), component.getName(), used.getName())
 							.isTrue();
 				}

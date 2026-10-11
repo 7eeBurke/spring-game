@@ -37,6 +37,10 @@ final class TextRole {
 		this.settings = Objects.requireNonNull(settings, "settings");
 	}
 
+	int promptVersion() {
+		return promptVersion;
+	}
+
 	Narration narrate(Object input, Predicate<String> acceptable, Supplier<String> fallback) {
 		long start = System.nanoTime();
 		AiResponse response = provider.generateText(

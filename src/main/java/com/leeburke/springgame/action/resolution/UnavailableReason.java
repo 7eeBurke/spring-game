@@ -7,5 +7,7 @@ public enum UnavailableReason {
 	MISSING_TARGET_PROFILE,
 	NO_INCOMING_ATTACK,
 	INCOMING_ATTACK_ALREADY_RESOLVED,
-	UNDEFINED_INJURY_MODIFIER
+	UNDEFINED_INJURY_MODIFIER,
+	/** The object is not within reach (not in the player's zone): the attempt cannot begin. */
+	OUT_OF_REACH
 }

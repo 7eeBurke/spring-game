@@ -33,6 +33,9 @@ public final class EffectApplier {
 		Map<String, Integer> enemyHp = new LinkedHashMap<>();
 		String zone = snapshot.location().zoneId();
 		Optional<String> exitId = Optional.empty();
+		List<String> visited = new ArrayList<>(List.of(zone));
+		List<String> opened = new ArrayList<>();
+		List<TakenItem> taken = new ArrayList<>();
 
 		for (OutcomeEffect effect : outcome.effects()) {
 			switch (effect) {
@@ -49,8 +52,11 @@ public final class EffectApplier {
 						throw new IllegalStateException("A move that does not fit the current location");
 					}
 					zone = moved.toZone();
+					visited.add(zone);
 				}
 				case OutcomeEffect.LeftScene left -> exitId = Optional.of(left.exitId());
+				case OutcomeEffect.ContainerOpened open -> opened.add(open.objectId());
+				case OutcomeEffect.ItemTaken item -> taken.add(new TakenItem(item.objectId(), item.itemCode()));
 			}
 		}
 
@@ -65,7 +71,8 @@ public final class EffectApplier {
 						.filter(r -> r instanceof StepResult.DefenseResult d
 								&& d.attackRef().equals(snapshot.pending().get().attack().ref()))
 						.isPresent());
-		return new StateChanges(snapshot.player().currentHp(), playerHp, enemyHp, defeated, zone, exitId, attackConsumed);
+		return new StateChanges(snapshot.player().currentHp(), playerHp, enemyHp, defeated, zone, exitId, attackConsumed, visited,
+				opened, taken);
 	}
 
 	/**
@@ -76,15 +83,27 @@ public final class EffectApplier {
 	 * @param zone           the player's zone within the current scene after movement
 	 * @param exitId         the exit the player left through, if any
 	 * @param attackConsumed whether the pending attack was resolved by a defense
+	 * @param visited        every zone of the current scene the player stood in during the turn, in order
+	 * @param opened         containers opened this turn
+	 * @param taken          items taken from containers this turn, in order
 	 */
 	public record StateChanges(int playerHpBefore, int playerHpAfter, Map<String, Integer> enemyHp, List<String> defeated,
-			String zone, Optional<String> exitId, boolean attackConsumed) {
+			String zone, Optional<String> exitId, boolean attackConsumed, List<String> visited, List<String> opened,
+			List<TakenItem> taken) {
 
 		public StateChanges {
 			enemyHp = Map.copyOf(enemyHp);
 			defeated = List.copyOf(defeated);
+			visited = List.copyOf(visited);
+			opened = List.copyOf(opened);
+			taken = List.copyOf(taken);
 			Objects.requireNonNull(zone, "zone");
 			Objects.requireNonNull(exitId, "exitId");
+		}
+
+		/** Whether the turn changed any container. */
+		public boolean containersChanged() {
+			return !opened.isEmpty() || !taken.isEmpty();
 		}
 
 		public int playerHpLost() {
@@ -93,6 +112,14 @@ public final class EffectApplier {
 
 		public boolean playerDown() {
 			return playerHpAfter == 0;
+		}
+	}
+
+	/** An item taken out of a container. */
+	public record TakenItem(String objectId, String itemCode) {
+		public TakenItem {
+			Objects.requireNonNull(objectId, "objectId");
+			Objects.requireNonNull(itemCode, "itemCode");
 		}
 	}
 }

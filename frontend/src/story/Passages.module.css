@@ -207,3 +207,12 @@
   font-style: italic;
   color: var(--color-text-muted);
 }
+
+/* A walk to another place in the same scene: a quiet map reference under the turn. */
+.placeSub {
+  margin: var(--space-2) 0 var(--space-1);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+}

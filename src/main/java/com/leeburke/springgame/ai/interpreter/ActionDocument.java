@@ -50,8 +50,9 @@ public record ActionDocument(
 		Objects.requireNonNull(confidence, "confidence");
 		steps = List.copyOf(Objects.requireNonNull(steps, "steps"));
 		unresolved = List.copyOf(Objects.requireNonNull(unresolved, "unresolved"));
-		if (supported && steps.isEmpty()) {
-			throw new IllegalArgumentException("a supported action needs at least one step");
+		// The one way to say "I cannot tell what the player means" is no steps plus the unclear phrases.
+		if (supported && steps.isEmpty() && unresolved.isEmpty()) {
+			throw new IllegalArgumentException("a supported action needs at least one step, or the unclear phrases in unresolved");
 		}
 		if (!supported && !steps.isEmpty()) {
 			throw new IllegalArgumentException("an unsupported action has no steps");

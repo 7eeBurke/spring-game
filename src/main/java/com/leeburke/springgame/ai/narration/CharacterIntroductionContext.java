@@ -44,6 +44,7 @@ public record CharacterIntroductionContext(String name, Map<StatType, Integer> s
 		}
 		int fated = character.fated().value();
 		return new CharacterIntroductionContext(character.name(), stats, fated, FatedBand.of(fated), weapons,
-				character.passive().displayName(), character.ability().displayName(), items, lore.premise());
+				character.passive().displayName(), character.ability().displayName(), items,
+				java.util.stream.Stream.concat(lore.premise().stream(), java.util.stream.Stream.of(lore.objective())).toList());
 	}
 }

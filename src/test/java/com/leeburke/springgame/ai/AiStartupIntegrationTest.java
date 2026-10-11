@@ -2,6 +2,8 @@ package com.leeburke.springgame.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -26,6 +28,9 @@ class AiStartupIntegrationTest {
 	@Autowired
 	private PromptLibrary prompts;
 
+	@Autowired
+	private AiRoleSettings settings;
+
 	@Test
 	void enabledWithoutKeyStartsWithTheDisabledProvider() {
 		assertThat(provider).isInstanceOfSatisfying(DisabledAiProvider.class,
@@ -36,8 +41,22 @@ class AiStartupIntegrationTest {
 				.isInstanceOf(ActionInterpretationResult.Failed.class);
 		for (AiRole role : AiRole.values()) {
 			assertThat(prompts.instructions(role)).isNotBlank();
-			assertThat(prompts.version(role)).isEqualTo(
-					role == AiRole.OUTCOME_NARRATOR || role == AiRole.ACTION_INTERPRETER ? 2 : 1);
+			assertThat(prompts.version(role)).isEqualTo(switch (role) {
+				case ACTION_INTERPRETER -> 7;
+				case OUTCOME_NARRATOR -> 7;
+				case CHARACTER_INTRODUCTION -> 2;
+				case ENEMY_ATTACK_NARRATOR -> 1;
+			});
+		}
+	}
+
+	@Test
+	void theNarratorHasItsOwnModelAndEffortAndEveryOtherRoleKeepsTheGlobalModel() {
+		assertThat(settings.forRole(AiRole.OUTCOME_NARRATOR).model()).isEqualTo("gpt-5.4-mini");
+		assertThat(settings.forRole(AiRole.OUTCOME_NARRATOR).reasoningEffort()).contains("none");
+		for (AiRole role : List.of(AiRole.ACTION_INTERPRETER, AiRole.ENEMY_ATTACK_NARRATOR, AiRole.CHARACTER_INTRODUCTION)) {
+			assertThat(settings.forRole(role).model()).as(role.name()).isEqualTo("some-model");
+			assertThat(settings.forRole(role).reasoningEffort()).as(role.name()).isEmpty();
 		}
 	}
 }

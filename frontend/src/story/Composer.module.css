@@ -79,6 +79,36 @@
   cursor: not-allowed;
 }
 
+.spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid var(--color-gold-dim);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+    border-top-color: var(--color-gold-dim);
+    opacity: 0.6;
+  }
+}
+
+.counter {
+  margin-top: var(--space-1);
+  font-size: var(--text-label);
+  text-align: right;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .ended {
   display: flex;
   align-items: center;

@@ -34,6 +34,7 @@ public final class ActionEngine {
 	private final AttackResolver attacks;
 	private final DefenseResolver defenses;
 	private final MovementResolver movement = new MovementResolver();
+	private final InteractionResolver interactions = new InteractionResolver();
 
 	public ActionEngine() {
 		CheckResolver checks = new CheckResolver();
@@ -59,12 +60,18 @@ public final class ActionEngine {
 		boolean playerDown = remainingHp == 0;
 		boolean leftScene = false;
 		Map<String, Integer> targetHp = new HashMap<>(context.targetHitPoints());
+		// Containers and tool-belt room as the steps play out, so "open it, then take what's inside" works.
+		Map<String, com.leeburke.springgame.world.ContainerState> containers = new HashMap<>();
+		context.scene().containers().forEach(c -> containers.put(c.objectId(), c));
+		int[] beltRoom = { context.player().toolBelt().emptySlots() };
 
 		for (ActionStep step : intent.steps()) {
 			StepOutcome outcome;
 			if (playerDown) {
 				outcome = StepOutcome.cancelled(step.id(), step.actionType(), CancellationReason.PLAYER_DOWN);
-			} else if (leftScene) {
+			} else if (leftScene && !lookingAround(step)) {
+				// Everything here refers to the scene left behind. Only a look around (no target) carries
+				// on, in the new place: it reveals nothing and has no effect.
 				outcome = StepOutcome.cancelled(step.id(), step.actionType(), CancellationReason.LEFT_SCENE);
 			} else if (targetsFallen(step, targetHp)) {
 				outcome = StepOutcome.cancelled(step.id(), step.actionType(), CancellationReason.TARGET_DEFEATED);
@@ -73,7 +80,9 @@ public final class ActionEngine {
 			} else if (step.relation() == StepRelation.IF_PREVIOUS_SUCCEEDS && !outcomes.getLast().succeeded()) {
 				outcome = StepOutcome.cancelled(step.id(), step.actionType(), CancellationReason.PREVIOUS_STEP_NOT_SUCCESSFUL);
 			} else {
-				outcome = resolveStep(step, intent.responseToAttack(), context, currentZone, resolvedAttacks, rng);
+				outcome = step.payload() instanceof ActionPayload.InteractPayload interact
+						? interactions.resolve(step, interact, context.scene(), currentZone, containers, beltRoom[0])
+						: resolveStep(step, intent.responseToAttack(), context, currentZone, resolvedAttacks, rng);
 			}
 			outcomes.add(outcome);
 
@@ -87,6 +96,11 @@ public final class ActionEngine {
 					case OutcomeEffect.TargetDamaged damaged -> targetHp.computeIfPresent(damaged.entityId(),
 							(id, hp) -> hp - Math.min(hp, damaged.hpDamage()));
 					case OutcomeEffect.LeftScene left -> leftScene = true;
+					case OutcomeEffect.ContainerOpened opened -> containers.computeIfPresent(opened.objectId(), (id, c) -> c.opened());
+					case OutcomeEffect.ItemTaken taken -> {
+						containers.computeIfPresent(taken.objectId(), (id, c) -> c.without(taken.itemCode()));
+						beltRoom[0]--;
+					}
 				}
 			}
 		}
@@ -108,10 +122,16 @@ public final class ActionEngine {
 					StepSuccess.SUCCESS, Optional.empty(),
 					new StepResult.CommunicationResult(communicate.kind(), addressee(communicate.target())), List.of());
 			case ActionPayload.InteractPayload p -> notImplemented(step);
-			case ActionPayload.ObservePayload p -> notImplemented(step);
+			case ActionPayload.ObservePayload observe -> StepOutcome.resolved(step.id(), ActionType.OBSERVE, StepSuccess.SUCCESS,
+					Optional.empty(), new StepResult.ObservationResult(observe.kind()), List.of());
 			case ActionPayload.UseAbilityPayload p -> notImplemented(step);
 			case ActionPayload.UseItemPayload p -> notImplemented(step);
 		};
+	}
+
+	/** An untargeted observation: taking in wherever the player now is. */
+	private static boolean lookingAround(ActionStep step) {
+		return step.payload() instanceof ActionPayload.ObservePayload observe && observe.target() instanceof ActionTarget.Unspecified;
 	}
 
 	/**

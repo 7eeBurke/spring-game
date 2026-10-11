@@ -50,6 +50,7 @@ export function sampleView(overrides: Partial<GameView> = {}): GameView {
     awaiting: 'ACTION',
     finalizing: false,
     introduction: { text: 'You are Wren.', source: 'AI' },
+    objective: 'Follow Chapel Road to the Hollow Chapel, and discover what guards its depths.',
     character: {
       name: 'Wren', hp: 24, maxHp: 24, stats: { MIGHT: 5 }, fated: 1, fatedBand: 'TOUCHED',
       body: [{ part: 'HEAD', severity: 'HEALTHY' }], weapons: [{ alias: 'weapon_1', name: 'Longsword' }],
@@ -86,7 +87,7 @@ export function chroniclePage(from: number, to: number, overrides: Partial<Chron
     runId: RUN_ID,
     status: 'ACTIVE',
     latestTurnNumber: to,
-    opening: from <= 1 ? { introduction: { text: 'You are Wren.', source: 'AI' }, scene: 'The Last Lantern', zone: 'Lantern Hearth' } : null,
+    opening: from <= 1 ? { introduction: { text: 'You are Wren.', source: 'AI' }, objective: 'Follow Chapel Road to the Hollow Chapel, and discover what guards its depths.', scene: 'The Last Lantern', zone: 'Lantern Hearth' } : null,
     turns,
     nextBefore: from <= 1 ? null : from,
     ...overrides,

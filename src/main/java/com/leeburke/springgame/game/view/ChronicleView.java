@@ -18,8 +18,11 @@ import com.leeburke.springgame.game.view.GameView.NarrationView;
 public record ChronicleView(UUID runId, String status, int latestTurnNumber, Opening opening, List<Turn> turns,
 		Integer nextBefore) {
 
-	/** @param introduction null only if a run's introduction was never stored */
-	public record Opening(NarrationView introduction, String scene, String zone) {
+	/**
+	 * @param introduction null only if a run's introduction was never stored
+	 * @param objective    the player's opening direction, from the lore
+	 */
+	public record Opening(NarrationView introduction, String objective, String scene, String zone) {
 	}
 
 	/**
@@ -27,12 +30,13 @@ public record ChronicleView(UUID runId, String status, int latestTurnNumber, Ope
 	 *
 	 * @param action           the player's exact accepted wording, or null for turns recorded before it was kept
 	 * @param enteredScene     the scene and zone arrived in through an exit, or null
+	 * @param movedTo          the zone moved to within the same scene (its map label), or null
 	 * @param narration        the outcome narration, or null while it is still being finalised
 	 * @param narrationPending the mechanics are committed but the narration is not stored yet
 	 * @param enemy            the enemy that responded, or null
 	 * @param ending           DEAD or VICTORIOUS when this turn ended the run, else null
 	 */
-	public record Turn(int turnNumber, Action action, Place enteredScene, NarrationView narration, boolean narrationPending,
+	public record Turn(int turnNumber, Action action, Place enteredScene, String movedTo, NarrationView narration, boolean narrationPending,
 			Enemy enemy, String ending) {
 	}
 

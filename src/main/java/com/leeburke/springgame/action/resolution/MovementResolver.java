@@ -29,6 +29,11 @@ final class MovementResolver {
 				&& move.target() instanceof ActionTarget.ExitTarget exit) {
 			return throughExit(step, exit.exitId(), scene, currentZone);
 		}
+		if (move.goal() == RelativeGoal.NONE && move.target() instanceof ActionTarget.ObjectTarget object
+				&& (move.movementType() == MovementType.REPOSITION || move.movementType() == MovementType.ADVANCE
+						|| move.movementType() == MovementType.CLOSE_DISTANCE)) {
+			return towardObject(step, object.objectId(), scene, currentZone);
+		}
 		boolean zoneMove = (move.movementType() == MovementType.REPOSITION || move.movementType() == MovementType.ADVANCE)
 				&& move.goal() == RelativeGoal.NONE
 				&& move.target() instanceof ActionTarget.ZoneTarget;
@@ -44,6 +49,24 @@ final class MovementResolver {
 		}
 		return resolved(step, StepSuccess.SUCCESS, new StepResult.MovementResult(currentZone, destination, true),
 				List.of(new OutcomeEffect.PlayerMoved(currentZone, destination)));
+	}
+
+	/**
+	 * Going toward an object: one move along the shortest passage the player knows toward its zone,
+	 * never more (a longer approach is one move per step). Already beside it: no move. No known way:
+	 * an automatic failure, with no movement and nothing revealed.
+	 */
+	private static StepOutcome towardObject(ActionStep step, String objectId, SceneState scene, String currentZone) {
+		String objectZone = scene.objects().stream().filter(o -> o.id().equals(objectId)).findFirst()
+				.map(com.leeburke.springgame.world.SceneObject::zoneId).orElse(currentZone);
+		if (objectZone.equals(currentZone)) {
+			return resolved(step, StepSuccess.SUCCESS, new StepResult.MovementResult(currentZone, currentZone, false), List.of());
+		}
+		return com.leeburke.springgame.world.SceneKnowledge.nextStepToward(scene, currentZone, objectZone)
+				.map(next -> resolved(step, StepSuccess.SUCCESS, new StepResult.MovementResult(currentZone, next, true),
+						List.of(new OutcomeEffect.PlayerMoved(currentZone, next))))
+				.orElseGet(() -> resolved(step, StepSuccess.FAILURE, new StepResult.MovementResult(currentZone, objectZone, false),
+						List.of()));
 	}
 
 	/**

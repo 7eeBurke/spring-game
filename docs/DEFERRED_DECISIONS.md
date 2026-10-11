@@ -86,6 +86,13 @@ Enemy stats, HP, defense DC, attack difficulty, anatomy for the four MVP enemies
 - Per-object and per-zone state (for example burned, open) and zone tags.
 - Migration of persisted scene-state JSON documents between `state_schema_version`s.
 
+- Line of sight: perception is the current zone plus zones joined by a visible connection; seen zones are remembered.
+- Enemy movement, attack range and ranged attacks. Until then only an enemy in the player's zone may act; enemies elsewhere wait.
+- Range checks for player attacks (today any visible enemy in the scene can be attacked, from any zone).
+- Locks, stuck lids, barred doors, forcing (for example with the crowbar) and any DC for interaction.
+- Loot beyond the single-item containers (loot tables, rarity, equipment drops), dropping items into containers, closing containers.
+- Searching for hidden content, and object state other than containers (burned, broken).
+
 ## Presentation and Contracts
 
 Decided in Stage 13 (see `AI_CONTRACTS.md`): the AI-facing alias format and how player-owned references are minted; the provider (OpenAI Java SDK behind `AiProvider`); the action document and its strict parsing; the one-repair policy; `ACTION_NOT_SUPPORTED` and `INTERPRETATION_FAILED`; the slash-command fallback; narration facts; attack cues; prompt versions; character-introduction persistence; and the Fated narration bands. Still deferred:

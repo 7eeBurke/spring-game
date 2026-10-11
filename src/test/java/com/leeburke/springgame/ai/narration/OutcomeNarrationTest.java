@@ -212,6 +212,107 @@ class OutcomeNarrationTest {
 		assertThat(provider.textRequests().getFirst().inputJson()).doesNotContain("Back away");
 	}
 
+	// --- Pacing at the source: what the storyteller is (and is not) asked to tell ---
+
+	private static AttemptedAction attemptOf(ActionType type, String manner) {
+		return new AttemptedAction(type, Optional.of(manner), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+				Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+	}
+
+	private static final Perception AISLE = new Perception(
+			Optional.of(new Perception.PlaceRef("Central Aisle", "the central aisle", "A broad aisle littered with fallen roof slates.")),
+			List.of(), List.of(new Perception.SeenThing("Crate", "A wooden crate with a loose lid.", "here", true, Optional.of("open and empty"))),
+			List.of(), List.of(), List.of());
+
+	@Test
+	void aLookThatFindsNothingChangedIsToldByTheGameWithNoModelCall() {
+		OutcomeNarrationContext context = new OutcomeNarrationContext(NarrationMode.NORMAL, "the central aisle", OverallResult.COMPLETE_SUCCESS,
+				List.of(new NarrationFact.Perceived(1, attemptOf(ActionType.OBSERVE, "WATCH"), AISLE, true)), Optional.empty(),
+				Optional.of("I look around again"));
+		FakeAiProvider provider = FakeAiProvider.answering("This must not be used.");
+
+		Narration told = new OutcomeNarrator(provider, "OUTCOME", 6, FakeAiProvider.settings()).narrate(context);
+
+		assertThat(provider.calls()).as("no model call").isZero();
+		assertThat(told.source()).isEqualTo(NarrationSource.DIRECT);
+		assertThat(told.fallbackReason()).as("not a failure").isEmpty();
+		assertThat(told.text()).isEqualTo("Nothing has changed around you.");
+	}
+
+	@Test
+	void anUnchangedLookAlongsideAnotherEventStillGoesToTheStorytellerWithoutTheRecap() {
+		NarrationFact waited = new NarrationFact.StayedPut(1, attemptOf(ActionType.MOVE, "HOLD_POSITION"),
+				new Perception.PlaceRef("Central Aisle", "the central aisle", ""), Optional.empty());
+		OutcomeNarrationContext context = new OutcomeNarrationContext(NarrationMode.NORMAL, "the central aisle", OverallResult.COMPLETE_SUCCESS,
+				List.of(waited, new NarrationFact.Perceived(2, attemptOf(ActionType.OBSERVE, "WATCH"), AISLE, true)), Optional.empty(),
+				Optional.of("I wait and look around"));
+		FakeAiProvider provider = FakeAiProvider.answering("You hold still. Nothing has moved.");
+
+		Narration told = new OutcomeNarrator(provider, "OUTCOME", 6, FakeAiProvider.settings()).narrate(context);
+
+		assertThat(provider.calls()).isEqualTo(1);
+		assertThat(told.source()).isEqualTo(NarrationSource.AI);
+		String sent = provider.textRequests().getFirst().inputJson();
+		assertThat(sent).contains("StayedPut", "Perceived", "\"unchanged\":true", "the central aisle")
+				.doesNotContain("fallen roof slates").doesNotContain("A wooden crate");
+		assertThat(context.facts().get(1)).as("the stored fact keeps the whole look, to compare the next one")
+				.isEqualTo(new NarrationFact.Perceived(2, attemptOf(ActionType.OBSERVE, "WATCH"), AISLE, true));
+	}
+
+	@Test
+	void anOpenedContainerTellsWhatIsInsideAndHowItLooks() {
+		String told = OutcomeFallback.sentence(new NarrationFact.OpenedContainer(1, attemptOf(ActionType.INTERACT, "OPEN"), "Crate",
+				List.of(new NarrationFact.Found("Restorative Salve", "A small stoppered clay vial of thick, bitter-smelling ointment.")), false));
+
+		assertThat(told).isEqualTo("You open the Crate. Inside is a Restorative Salve. A small stoppered clay vial of thick, bitter-smelling ointment.");
+		assertThat(OutcomeFallback.sentence(new NarrationFact.OpenedContainer(1, attemptOf(ActionType.INTERACT, "OPEN"), "Crate", List.of(),
+				false))).isEqualTo("You open the Crate; it is empty.");
+	}
+
+	@Test
+	void aLookForWaysNamesWhatIsLeftOrSaysHonestlyThatNothingIsKnown() {
+		AttemptedAction look = new AttemptedAction(ActionType.OBSERVE, Optional.of("SEARCH"), Optional.empty(), Optional.empty(),
+				Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+		Perception nothing = new Perception(Optional.empty(), List.of(), List.of(), List.of(), List.of(), List.of());
+		NarrationFact.Lead wayOn = new NarrationFact.Lead("a low door behind where the altar rail once stood", "the apse", 2,
+				Optional.of("the central aisle"), Optional.of(Surroundings.UNEXPLORED));
+		NarrationFact.Lead pews = new NarrationFact.Lead("the collapsed pews", "the collapsed pews", 2, Optional.of("the central aisle"),
+				Optional.empty());
+
+		String leads = OutcomeFallback.sentence(new NarrationFact.SoughtWays(1, look, nothing, List.of(wayOn), List.of(pews),
+				List.of("the central aisle"), List.of(), true, false));
+		assertThat(leads).isEqualTo("Not yet explored: a low door behind where the altar rail once stood, from the apse, "
+				+ "by way of the central aisle. Not yet visited: the collapsed pews, by way of the central aisle. Already walked: the central aisle.");
+
+		NarrationFact.Lead back = new NarrationFact.Lead("the sagging west doors you came in by, back out to the chapel road", "here", 0,
+				Optional.empty(), Optional.of("the way to The Last Lantern"));
+		String none = OutcomeFallback.sentence(new NarrationFact.SoughtWays(1, look, nothing, List.of(), List.of(), List.of(),
+				List.of(back), true, true));
+		assertThat(none).isEqualTo("You know of no way here that you have not already tried.").doesNotContain("no other way");
+	}
+
+	@Test
+	void takingAnItemTellsWhatItLooksLikeNeverThatItIsStillInside() {
+		AttemptedAction take = new AttemptedAction(ActionType.INTERACT, Optional.of("PICK_UP"), Optional.empty(), Optional.empty(),
+				Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+		String told = OutcomeFallback.sentence(new NarrationFact.TookItem(1, take, "Restorative Salve",
+				"A small stoppered clay vial of thick, bitter-smelling ointment.", "Crate"));
+
+		assertThat(told).isEqualTo("You take the Restorative Salve from the Crate and tuck it into your belt. "
+				+ "A small stoppered clay vial of thick, bitter-smelling ointment.");
+	}
+
+	@Test
+	void somethingOutOfReachIsToldAsOutOfReachNeverAsAnAttempt() {
+		AttemptedAction open = new AttemptedAction(ActionType.INTERACT, Optional.of("OPEN"), Optional.empty(), Optional.empty(),
+				Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+		String told = OutcomeFallback.sentence(new NarrationFact.InteractionFailed(1, open, "Crate",
+				com.leeburke.springgame.action.resolution.StepResult.InteractionFailure.OUT_OF_REACH, Optional.of("the narrow alcove")));
+
+		assertThat(told).isEqualTo("The Crate is out of reach from here: it is in the narrow alcove.");
+		assertThat(told).doesNotContainIgnoringCase("try").doesNotContainIgnoringCase("attempt");
+	}
+
 	@Test
 	void speechFactsCannotBeBuiltWithWordsWhenNothingWasSaid() {
 		AttemptedAction words = new AttemptedAction(ActionType.COMMUNICATE, Optional.of("SAY"), Optional.empty(), Optional.empty(),
@@ -269,13 +370,13 @@ class OutcomeNarrationTest {
 	void movementAndStayingPut() {
 		assertThat(OutcomeFallback.sentence(onlyFact(TO_AISLE,
 				resolved(1, ActionType.MOVE, new StepResult.MovementResult("entrance", "aisle", true)))))
-				.isEqualTo("You move from the Nave Entrance to the Side Aisle.");
+				.isEqualTo("You make your way to the side aisle."); // this fixture scene has no authored passage
 		assertThat(OutcomeFallback.sentence(onlyFact(TO_AISLE,
 				resolved(1, ActionType.MOVE, new StepResult.MovementResult("entrance", "aisle", false)))))
-				.isEqualTo("You cannot reach the Side Aisle from here, and stay in the Nave Entrance.");
+				.isEqualTo("You find no way from the nave entrance to the side aisle, and stay where you are.");
 		assertThat(OutcomeFallback.sentence(onlyFact(HOLD,
 				resolved(1, ActionType.MOVE, new StepResult.MovementResult("entrance", "entrance", false)))))
-				.isEqualTo("You hold your ground in the Nave Entrance.");
+				.isEqualTo("You stay where you are.");
 	}
 
 	@Test
@@ -375,5 +476,115 @@ class OutcomeNarrationTest {
 		Narration overlong = new OutcomeNarrator(FakeAiProvider.answering("x".repeat(OutcomeNarrator.MAX_LENGTH + 1)), "OUTCOME", 2,
 				FakeAiProvider.settings()).narrate(context);
 		assertThat(overlong.fallbackReason()).contains(AiFailureKind.MALFORMED_RESPONSE);
+	}
+
+	@Test
+	void theNarratorIsToldThatANamedPlaceIsNotReachedUntilTheFactsSaySo() {
+		String instructions = new com.leeburke.springgame.ai.PromptLibrary().instructions(com.leeburke.springgame.ai.AiRole.OUTCOME_NARRATOR);
+
+		assertThat(instructions).contains("If the player's wording names a place that the facts do not confirm as where they arrived, "
+				+ "they have not reached it: never say they entered, reached or are inside it");
+	}
+
+	// --- Where the player ends up, and arrivals ---
+
+	static final ActionPayload LOOK = new ActionPayload.ObservePayload(ObservationKind.SEARCH, ActionTarget.unspecified());
+	static final ActionPayload THROUGH_DOOR = new ActionPayload.MovePayload(MovementType.ADVANCE,
+			new ActionTarget.ExitTarget("north_door", EXPLICIT), RelativeGoal.NONE, ActionApproach.NORMAL);
+
+	static StepOutcome leftThroughTheDoor(int step) {
+		return new StepOutcome("s" + step, ActionType.MOVE, StepStatus.RESOLVED, Optional.of(StepSuccess.SUCCESS), Optional.empty(),
+				Optional.of(new StepResult.ExitResult("north_door")),
+				List.of(new com.leeburke.springgame.action.resolution.OutcomeEffect.LeftScene("north_door")), Optional.empty(),
+				Optional.empty());
+	}
+
+	@Test
+	void theContextNamesTheZoneThePlayerEndsIn() {
+		OutcomeNarrationContext context = context(validated(TO_AISLE, LOOK),
+				resolved(1, ActionType.MOVE, new StepResult.MovementResult("entrance", "aisle", true)),
+				resolved(2, ActionType.OBSERVE, new StepResult.ObservationResult(ObservationKind.SEARCH)));
+
+		// In the world's words (this fixture scene has no authored phrase, so it falls back to the label, lower case).
+		assertThat(context.currentZone()).isEqualTo("the side aisle");
+		assertThat(((NarrationFact.Perceived) context.facts().get(1)).perception().here().orElseThrow().label()).isEqualTo("Side Aisle");
+	}
+
+	@Test
+	void anExitIsNamedByWhereItLeadsNotAsAnExit() {
+		OutcomeNarrationContext context = builder.build(outcome(OverallResult.COMPLETE_SUCCESS, leftThroughTheDoor(1)),
+				validated(THROUGH_DOOR), incoming, NarrationMode.NORMAL, Optional.empty(), Optional.empty(),
+				Optional.of(new OutcomeNarrationContextBuilder.Arrival("Ossuary", "Warden Post")),
+				new OutcomeNarrationContextBuilder.SceneKnowledge(java.util.Set.of(), Map.of("north_door", "the way to the Ossuary")));
+
+		assertThat(context.facts().getFirst().attempt().target()).contains("the way to the Ossuary");
+	}
+
+	/** The Sacristy as a player arriving from the hub knows it: the threshold, the racks beside it, a closed crate there. */
+	static final com.leeburke.springgame.world.view.PlayerSceneView SACRISTY = new com.leeburke.springgame.world.view.PlayerSceneView(
+			"vestry_door",
+			List.of(new com.leeburke.springgame.world.view.PlayerSceneView.VisibleZone("vestry_door", "Vestry Threshold"),
+					new com.leeburke.springgame.world.view.PlayerSceneView.VisibleZone("vestment_racks", "Vestment Racks")),
+			List.of(new com.leeburke.springgame.world.view.PlayerSceneView.VisibleConnection("vestry_door", "vestment_racks")),
+			List.of(), List.of(new com.leeburke.springgame.world.view.PlayerSceneView.VisibleObject("first_find", "CRATE", "vestment_racks")),
+			List.of(), List.of(new com.leeburke.springgame.world.view.PlayerSceneView.KnownExit("hub_return", "vestry_door")), List.of(),
+			List.of(new com.leeburke.springgame.world.view.PlayerSceneView.VisibleContainer("first_find", false, List.of())));
+
+	static OutcomeNarrationContextBuilder.Arrival intoTheSacristy() {
+		return new OutcomeNarrationContextBuilder.Arrival("Sacristy", "Vestry Threshold",
+				Optional.of(new OutcomeNarrationContextBuilder.ArrivalView("SACRISTY", SACRISTY, java.util.Set.of(),
+						Map.of("hub_return", "the way to The Last Lantern"), Optional.of("hub_return"))));
+	}
+
+	@Test
+	void anArrivalEstablishesThePlaceAndALookThereAddsOnlyWhatIsNew() {
+		OutcomeNarrationContext context = builder.build(outcome(OverallResult.COMPLETE_SUCCESS, leftThroughTheDoor(1),
+						resolved(2, ActionType.OBSERVE, new StepResult.ObservationResult(ObservationKind.SEARCH))),
+				validated(THROUGH_DOOR, LOOK), incoming, NarrationMode.NORMAL, Optional.empty(), Optional.empty(),
+				Optional.of(intoTheSacristy()), OutcomeNarrationContextBuilder.SceneKnowledge.NONE);
+
+		assertThat(context.facts()).extracting(f -> f.getClass().getSimpleName()).containsExactly("CrossedInto", "Perceived");
+		NarrationFact.CrossedInto crossed = (NarrationFact.CrossedInto) context.facts().get(0);
+		assertThat(crossed.sceneDescription()).startsWith("A cramped sacristy");
+		assertThat(crossed.arrival().phrase()).isEqualTo("the threshold of the sacristy");
+		assertThat(crossed.behind()).contains("a narrow doorway in the sacristy wall");
+		assertThat(crossed.behindLeadsTo()).contains("the way to The Last Lantern");
+		Perception seen = ((NarrationFact.Perceived) context.facts().get(1)).perception();
+		assertThat(seen.here()).as("the arrival already told the place").isEmpty();
+		assertThat(seen.beside()).singleElement().satisfies(b -> {
+			assertThat(b.place().phrase()).isEqualTo("the vestment racks");
+			assertThat(b.passage()).isEqualTo("the cramped room beyond the threshold");
+		});
+		assertThat(seen.things()).singleElement().satisfies(crate -> {
+			assertThat(crate.here()).as("in the next place: in sight, not within reach").isFalse();
+			assertThat(crate.state()).contains("closed");
+		});
+		assertThat(context.currentZone()).isEqualTo("the threshold of the sacristy");
+
+		String told = OutcomeFallback.render(context);
+		assertThat(told).doesNotContain("Vestry Threshold", "Vestment Racks", "Sacristy");
+		assertThat(told).containsOnlyOnce("worn hollow in the middle"); // the threshold is described once
+	}
+
+	@Test
+	void theFallbackNeverTellsTheMachinery() {
+		OutcomeNarrationContext context = builder.build(outcome(OverallResult.PARTIAL_SUCCESS, leftThroughTheDoor(1),
+						cancelled(2, ActionType.ATTACK, CancellationReason.LEFT_SCENE)),
+				validated(THROUGH_DOOR, slash(Optional.empty())), incoming, NarrationMode.NORMAL, Optional.empty(), Optional.empty(),
+				Optional.of(new OutcomeNarrationContextBuilder.Arrival("Ossuary", "Warden Post")),
+				OutcomeNarrationContextBuilder.SceneKnowledge.NONE);
+
+		assertThat(OutcomeFallback.render(context).toLowerCase(java.util.Locale.ROOT))
+				.doesNotContain("reposition", "through the exit", "scene called", "cancel");
+	}
+
+	@Test
+	void theNarratorIsToldToSpeakAsTheWorldAndThatApproachingIsNotEntering() {
+		String instructions = new com.leeburke.springgame.ai.PromptLibrary().instructions(com.leeburke.springgame.ai.AiRole.OUTCOME_NARRATOR);
+
+		assertThat(instructions).contains("Only a CrossedInto (or, in older records, PlayerLeftScene) fact means the player went through",
+				"Speak as the world, not the game", "\"repositioning\"", "the label is only a map heading, so never write it",
+				"A thing \"here\" is within reach; a thing in a place beside is not",
+				"When \"inSight\" is false, it is too far to make out", "Ordinary words like \"doorway\", \"way out\" or \"place\" are fine");
 	}
 }

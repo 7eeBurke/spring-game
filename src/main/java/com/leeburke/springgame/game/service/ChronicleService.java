@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.leeburke.springgame.ai.narration.EnemyAttackNarration;
+import com.leeburke.springgame.ai.narration.LoreCatalog;
 import com.leeburke.springgame.ai.narration.NarrationFact;
 import com.leeburke.springgame.content.world.FixedSceneDefinition;
 import com.leeburke.springgame.content.world.WorldContentCatalog;
@@ -49,14 +50,17 @@ public class ChronicleService {
 	private final TurnStore turns;
 	private final IntroductionStore introductions;
 	private final WorldContentCatalog world;
+	private final LoreCatalog lore;
 	private final TurnJson json = new TurnJson();
 	private final StoredResponses responses = new StoredResponses();
 
-	ChronicleService(RunSessionStore sessions, TurnStore turns, IntroductionStore introductions, WorldContentCatalog world) {
+	ChronicleService(RunSessionStore sessions, TurnStore turns, IntroductionStore introductions, WorldContentCatalog world,
+			LoreCatalog lore) {
 		this.sessions = Objects.requireNonNull(sessions, "sessions");
 		this.turns = Objects.requireNonNull(turns, "turns");
 		this.introductions = Objects.requireNonNull(introductions, "introductions");
 		this.world = Objects.requireNonNull(world, "world");
+		this.lore = Objects.requireNonNull(lore, "lore");
 	}
 
 	/**
@@ -94,7 +98,7 @@ public class ChronicleService {
 				.orElseThrow(() -> new IllegalStateException("The hub definition is missing"));
 		String zone = hub.zones().stream().filter(z -> z.id().equals(hub.startZone())).map(SceneZone::displayName).findFirst()
 				.orElseThrow();
-		return new ChronicleView.Opening(introduction, hub.displayName(), zone);
+		return new ChronicleView.Opening(introduction, lore.objective(), hub.displayName(), zone);
 	}
 
 	private ChronicleView.Turn turn(TurnRecord record) {
@@ -116,12 +120,18 @@ public class ChronicleService {
 			enemy = new ChronicleView.Enemy(summary.enemyTurn().attacker(), summary.enemyTurn().action(), cue, attackNarration);
 		}
 		String ending = summary.runStatus().terminal() ? summary.runStatus().name() : null;
-		return new ChronicleView.Turn(summary.turnNumber(), action, entered, narration, !completed, enemy, ending);
+		return new ChronicleView.Turn(summary.turnNumber(), action, entered, summary.movedTo(), narration, !completed, enemy, ending);
 	}
 
 	/** The zone arrived in, as the confirmed narration fact named it. */
+	/** The arrival zone's label, from the crossing fact (or, in turns stored before it existed, the older one). */
 	private static String arrivalZone(MechanicsSummary summary) {
-		return summary.narration().facts().stream().filter(NarrationFact.PlayerLeftScene.class::isInstance)
-				.map(f -> ((NarrationFact.PlayerLeftScene) f).arrivalZone()).findFirst().orElse(null);
+		return summary.narration().facts().stream()
+				.map(f -> switch (f) {
+					case NarrationFact.CrossedInto crossed -> crossed.arrival().label();
+					case NarrationFact.PlayerLeftScene left -> left.arrivalZone();
+					default -> null;
+				})
+				.filter(java.util.Objects::nonNull).findFirst().orElse(null);
 	}
 }

@@ -71,6 +71,29 @@ class GameRulesTest {
 	}
 
 	@Test
+	void onlyEnemiesInThePlayersZoneCanAct() {
+		var state = scene.state();
+		String zoneOf = state.entities().stream().filter(e -> e.id().equals(first.entityId())).findFirst().orElseThrow().zoneId();
+
+		// Same zone: may act. Every other enemy listed stands in that zone too.
+		assertThat(EncounterRules.withinReach(visible, state, zoneOf)).contains(first)
+				.allSatisfy(e -> assertThat(state.entities().stream().filter(x -> x.id().equals(e.entityId())).findFirst().orElseThrow()
+						.zoneId()).isEqualTo(zoneOf));
+		// Any other zone (beside, farther or unseen): nobody from the first enemy's zone can reach it.
+		state.zones().stream().map(z -> z.id()).filter(z -> !z.equals(zoneOf))
+				.forEach(z -> assertThat(EncounterRules.withinReach(visible, state, z)).as(z).doesNotContain(first));
+	}
+
+	@Test
+	void theRotationCarriesOnWhenWhoCanActChanges() {
+		// The cursor names an enemy that can no longer act (it is elsewhere now): the next one by ID acts, or the first.
+		List<EnemyInstance> onlySecond = List.of(visible.get(1));
+		assertThat(EncounterRules.nextActor(onlySecond, scene.id(), cursor(scene.id(), visible.get(0)))).contains(visible.get(1));
+		List<EnemyInstance> onlyFirst = List.of(visible.get(0));
+		assertThat(EncounterRules.nextActor(onlyFirst, scene.id(), cursor(scene.id(), visible.get(1)))).contains(visible.get(0));
+	}
+
+	@Test
 	void aCursorOnAnEnemyThatFellMovesToTheNextLivingOne() {
 		List<EnemyInstance> two = List.of(withHp(visible.get(0), 0), visible.get(1));
 
@@ -114,10 +137,22 @@ class GameRulesTest {
 	@Test
 	void anIntentWithNothingResolvedLetsNoEnemyAct() {
 		GameSnapshot snapshot = HARNESS.snapshot(scene);
-		ResolvedOutcome outcome = HARNESS.resolve(snapshot, "/listen");
+		ResolvedOutcome outcome = HARNESS.resolve(snapshot, "/ability ability_1");
 
 		assertThat(outcome.overall()).isEqualTo(OverallResult.MECHANICS_UNAVAILABLE);
 		assertThat(EncounterRules.enemyPhaseRuns(outcome, RunStatus.ACTIVE, false, false)).isFalse();
+	}
+
+	@Test
+	void lookingAroundIsSafeButActingAfterwardsStillProvokes() {
+		GameSnapshot snapshot = HARNESS.snapshot(scene);
+		ResolvedOutcome look = HARNESS.resolve(snapshot, "/search");
+		ResolvedOutcome lookThenStrike = HARNESS.resolve(snapshot,
+				"/search ; /attack " + HARNESS.alias(snapshot, first.entityId()) + " slash" + WEAPON, 1);
+
+		assertThat(look.steps().getFirst().status()).isEqualTo(StepStatus.RESOLVED);
+		assertThat(EncounterRules.enemyPhaseRuns(look, RunStatus.ACTIVE, false, false)).isFalse();
+		assertThat(EncounterRules.enemyPhaseRuns(lookThenStrike, RunStatus.ACTIVE, false, false)).isTrue();
 	}
 
 	// --- Mandatory defense ---

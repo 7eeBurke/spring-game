@@ -26,11 +26,28 @@ class UnsupportedMechanicsTest {
 		return Stream.of(
 				new ActionPayload.InteractPayload(InteractionKind.PUSH,
 						new ActionTarget.ObjectTarget("pew_1", TargetSpecificity.EXPLICIT), Optional.empty(), ActionApproach.NORMAL),
-				new ActionPayload.ObservePayload(ObservationKind.INSPECT, acolyte()),
-				ActionFixtures.search(),
 				new ActionPayload.UseAbilityPayload(ActionFixtures.STONEBLOOD, new ActionTarget.SelfTarget(Optional.empty(),
 						TargetSpecificity.EXPLICIT)),
 				new ActionPayload.UseItemPayload(ActionFixtures.SALVE, ActionTarget.unspecified()));
+	}
+
+	/** Observation reads only what is visible: automatic, no roll, no effect, nothing revealed. */
+	@ParameterizedTest
+	@MethodSource("observations")
+	void observationResolvesAutomaticallyWithoutRevealingAnything(ActionPayload payload) {
+		FixedRolls rolls = new FixedRolls();
+		StepOutcome step = new Setup().resolve(intent(payload), rolls).steps().getFirst();
+
+		assertThat(step.status()).isEqualTo(StepStatus.RESOLVED);
+		assertThat(step.success()).contains(StepSuccess.SUCCESS);
+		assertThat(step.check()).isEmpty();
+		assertThat(step.result()).containsInstanceOf(StepResult.ObservationResult.class);
+		assertThat(step.effects()).isEmpty();
+		assertThat(rolls.drawn()).isZero();
+	}
+
+	static Stream<ActionPayload> observations() {
+		return Stream.of(new ActionPayload.ObservePayload(ObservationKind.INSPECT, acolyte()), ActionFixtures.search());
 	}
 
 	@ParameterizedTest

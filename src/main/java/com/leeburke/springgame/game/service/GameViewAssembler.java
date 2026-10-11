@@ -14,7 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 import com.leeburke.springgame.ai.interpreter.ActionInterpretationContext;
 import com.leeburke.springgame.ai.interpreter.AliasKind;
 import com.leeburke.springgame.ai.interpreter.InterpretationSetup;
+import com.leeburke.springgame.world.view.ExplorationLeads;
 import com.leeburke.springgame.ai.narration.FatedBand;
+import com.leeburke.springgame.ai.narration.LoreCatalog;
 import com.leeburke.springgame.character.PlayerCharacterState;
 import com.leeburke.springgame.content.world.RegionDefinition;
 import com.leeburke.springgame.content.world.WorldContentCatalog;
@@ -48,9 +50,10 @@ class GameViewAssembler {
 	private final WorldContentCatalog world;
 	private final WorldStore worldStore;
 	private final StoredResponses responses = new StoredResponses();
+	private final LoreCatalog lore;
 
 	GameViewAssembler(RunSessionStore sessions, GameStateLoader loader, ResolutionContextFactory contexts,
-			IntroductionStore introductions, TurnStore turns, WorldContentCatalog world, WorldStore worldStore) {
+			IntroductionStore introductions, TurnStore turns, WorldContentCatalog world, WorldStore worldStore, LoreCatalog lore) {
 		this.sessions = Objects.requireNonNull(sessions, "sessions");
 		this.loader = Objects.requireNonNull(loader, "loader");
 		this.contexts = Objects.requireNonNull(contexts, "contexts");
@@ -58,6 +61,7 @@ class GameViewAssembler {
 		this.turns = Objects.requireNonNull(turns, "turns");
 		this.world = Objects.requireNonNull(world, "world");
 		this.worldStore = Objects.requireNonNull(worldStore, "worldStore");
+		this.lore = Objects.requireNonNull(lore, "lore");
 	}
 
 	/** The current view, as GET shows it. */
@@ -87,7 +91,7 @@ class GameViewAssembler {
 
 	private GameView assemble(RunSession session, boolean finalizing, Optional<GameView.LastTurnView> lastTurn) {
 		GameSnapshot snapshot = loader.load(session);
-		InterpretationSetup setup = contexts.interpretation(snapshot);
+		InterpretationSetup setup = contexts.interpretation(snapshot, ExitLabels.of(snapshot.scene(), worldStore, world));
 		ActionInterpretationContext context = setup.context();
 		Map<String, String> zoneNames = context.zones().stream()
 				.collect(Collectors.toMap(ActionInterpretationContext.Zone::alias, ActionInterpretationContext.Zone::name));
@@ -102,10 +106,22 @@ class GameViewAssembler {
 				context.connections().stream().map(c -> new GameView.ConnectionView(c.zoneA(), c.zoneB())).toList(),
 				context.entities().stream().map(e -> new GameView.CreatureView(e.alias(), e.name(), e.zone(), e.condition().name())).toList(),
 				things(context.objects()), things(context.hazards()),
-				context.exits().stream().map(x -> new GameView.ExitView(x.alias(), x.zone())).toList());
+				context.exits().stream().map(x -> new GameView.ExitView(x.alias(), x.zone(), x.leadsTo())).toList(),
+				leads(snapshot, setup));
 		GameView.PendingAttackView pending = snapshot.pending().map(p -> pendingView(p, setup)).orElse(null);
 		return new GameView(session.runId(), session.status().name(), session.stateVersion(), awaiting, finalizing,
-				introduction, character(snapshot.player(), context), location, scene, pending, lastTurn.orElse(null));
+				introduction, snapshot.scene().regionInstanceId().isPresent() ? lore.objectiveInside() : lore.objective(),
+				character(snapshot.player(), context), location, scene, pending, lastTurn.orElse(null));
+	}
+
+	/** What is left to explore here, by alias, from the player's known view only. */
+	private GameView.LeadsView leads(GameSnapshot snapshot, InterpretationSetup setup) {
+		ExplorationLeads leads = ExplorationLeads.of(snapshot.view(), snapshot.scene().state().visitedZones(),
+				ExitLabels.undiscovered(snapshot.scene(), worldStore));
+		return new GameView.LeadsView(
+				leads.unexplored().stream().flatMap(w -> setup.aliases().aliasOf(AliasKind.EXIT, w.exitId()).stream()).toList(),
+				leads.unvisited().stream().flatMap(p -> setup.aliases().aliasOf(AliasKind.ZONE, p.zoneId()).stream()).toList(),
+				leads.visitsRecorded());
 	}
 
 	private String regionName(GameSnapshot snapshot) {
@@ -142,6 +158,6 @@ class GameViewAssembler {
 	}
 
 	private static List<GameView.ThingView> things(List<ActionInterpretationContext.Thing> things) {
-		return things.stream().map(t -> new GameView.ThingView(t.alias(), t.name(), t.zone())).toList();
+		return things.stream().map(t -> new GameView.ThingView(t.alias(), t.name(), t.zone(), t.container(), t.reach())).toList();
 	}
 }

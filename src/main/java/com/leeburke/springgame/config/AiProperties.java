@@ -28,8 +28,11 @@ public record AiProperties(
 		}
 	}
 
-	/** Optional per-role overrides; a null value means the global or role default. */
-	public record Role(String model, Integer maxOutputTokens, Double temperature) {
+	/**
+	 * Optional per-role overrides; a null value means the global or role default. {@code reasoningEffort}
+	 * is sent only to reasoning models (it is ignored, with a startup note, for a gpt-4 or gpt-3 model).
+	 */
+	public record Role(String model, Integer maxOutputTokens, Double temperature, String reasoningEffort) {
 	}
 
 	public record Roles(

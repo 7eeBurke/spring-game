@@ -91,9 +91,23 @@ public class AiConfiguration {
 			String model = overrides.model() != null && !overrides.model().isBlank() ? overrides.model() : properties.model();
 			int maxTokens = overrides.maxOutputTokens() != null ? overrides.maxOutputTokens() : DEFAULT_MAX_OUTPUT_TOKENS.get(role);
 			settings.put(role, new AiGenerationSettings(model, maxTokens, properties.timeout(),
-					Optional.ofNullable(overrides.temperature())));
+					Optional.ofNullable(overrides.temperature()), effort(role, model, overrides.reasoningEffort())));
 		}
 		return new AiRoleSettings(settings);
+	}
+
+	/**
+	 * The reasoning effort to send: only to a reasoning model. Setting a gpt-4 or gpt-3 model for a
+	 * role (for example, rolling the narrator back to gpt-4.1-mini) drops a configured effort rather
+	 * than sending a parameter that model rejects.
+	 */
+	static Optional<String> effort(AiRole role, String model, String configured) {
+		Optional<String> effort = Optional.ofNullable(configured).map(String::strip).filter(e -> !e.isEmpty());
+		if (effort.isPresent() && (model.startsWith("gpt-4") || model.startsWith("gpt-3"))) {
+			LOG.info("Reasoning effort for {} is not sent: {} is not a reasoning model", role, model);
+			return Optional.empty();
+		}
+		return model.isBlank() ? Optional.empty() : effort;
 	}
 
 	@Bean
@@ -107,8 +121,8 @@ public class AiConfiguration {
 	}
 
 	@Bean
-	InterpretationContextBuilder interpretationContextBuilder(WorldContentCatalog world) {
-		return new InterpretationContextBuilder(world);
+	InterpretationContextBuilder interpretationContextBuilder(WorldContentCatalog world, GameContentCatalog content) {
+		return new InterpretationContextBuilder(world, code -> content.findItem(code).map(item -> item.displayName()).orElse(code));
 	}
 
 	@Bean

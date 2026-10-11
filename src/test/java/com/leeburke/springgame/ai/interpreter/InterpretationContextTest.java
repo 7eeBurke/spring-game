@@ -26,11 +26,11 @@ class InterpretationContextTest {
 		ActionInterpretationContext context = InterpreterFixtures.setup().context();
 
 		assertThat(context.currentZone()).isEqualTo("zone_2");
-		assertThat(context.zones()).containsExactly(new Zone("zone_1", "Side Aisle"), new Zone("zone_2", "Nave Entrance"));
+		assertThat(context.zones()).containsExactly(new Zone("zone_1", "Side Aisle", null), new Zone("zone_2", "Nave Entrance", null));
 		assertThat(context.entities()).containsExactly(new ActionInterpretationContext.Creature("entity_1", "Hollow Acolyte", "zone_1",
 				ActionInterpretationContext.Condition.ACTIVE));
-		assertThat(context.objects()).containsExactly(new Thing("object_1", "Wooden Pew", "zone_2"));
-		assertThat(context.hazards()).containsExactly(new Thing("hazard_1", "Fire", "zone_1"));
+		assertThat(context.objects()).containsExactly(new Thing("object_1", "Wooden Pew", "zone_2", null, "here"));
+		assertThat(context.hazards()).containsExactly(new Thing("hazard_1", "Fire", "zone_1", null, "one step away"));
 		assertThat(context.weapons()).containsExactly(new Owned("weapon_1", "Longsword"));
 		assertThat(context.items()).containsExactly(new Owned("item_1", "Restorative Salve"), new Owned("item_2", "Crowbar"));
 		assertThat(context.abilities()).extracting(Owned::alias).containsExactly("ability_1");
@@ -78,6 +78,20 @@ class InterpretationContextTest {
 			assertThat(AliasKind.kindOf(matcher.group(1))).isPresent();
 		}
 		assertThat(seen).hasSizeGreaterThan(5);
+	}
+
+	@Test
+	void exitsSayWhereTheyLeadOnlyAsFarAsThePlayerKnows() {
+		InterpretationContextBuilder builder = new InterpretationContextBuilder(InterpreterFixtures.WORLD);
+
+		ActionInterpretationContext labelled = builder.build(InterpreterFixtures.view(), InterpreterFixtures.player(), List.of(),
+				Set.of(), java.util.Map.of("north_door", "the road to the Hollow Chapel")).context();
+		ActionInterpretationContext unlabelled = builder.build(InterpreterFixtures.view(), InterpreterFixtures.player(), List.of())
+				.context();
+
+		assertThat(labelled.exits()).extracting(ActionInterpretationContext.Exit::leadsTo).containsExactly("the road to the Hollow Chapel");
+		assertThat(unlabelled.exits()).extracting(ActionInterpretationContext.Exit::leadsTo).containsExactly("an unexplored way");
+		assertThat(labelled.contextVersion()).isEqualTo(2);
 	}
 
 	@Test

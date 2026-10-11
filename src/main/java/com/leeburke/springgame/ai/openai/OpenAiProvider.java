@@ -102,6 +102,8 @@ public final class OpenAiProvider implements AiProvider, AutoCloseable {
 				.maxOutputTokens(settings.maxOutputTokens())
 				.store(false);
 		settings.temperature().ifPresent(builder::temperature);
+		settings.reasoningEffort().ifPresent(effort -> builder.reasoning(
+				com.openai.models.Reasoning.builder().effort(com.openai.models.ReasoningEffort.of(effort)).build()));
 		return builder;
 	}
 

@@ -14,7 +14,7 @@ import com.leeburke.springgame.mechanics.BodySeverity;
  * stats, HP, enemy mechanics, difficulties or hidden content.
  */
 public record ActionInterpretationContext(
-		int schemaVersion,
+		int contextVersion,
 		String currentZone,
 		List<Zone> zones,
 		List<Connection> connections,
@@ -29,7 +29,7 @@ public record ActionInterpretationContext(
 		List<Owned> abilities,
 		List<IncomingAttackSummary> incomingAttacks) {
 
-	public static final int CURRENT_SCHEMA_VERSION = 1;
+	public static final int CURRENT_SCHEMA_VERSION = 2;
 
 	public ActionInterpretationContext {
 		Objects.requireNonNull(currentZone, "currentZone");
@@ -47,7 +47,17 @@ public record ActionInterpretationContext(
 		incomingAttacks = List.copyOf(incomingAttacks);
 	}
 
-	public record Zone(String alias, String name) {
+	/**
+	 * A known zone: its label, how the world refers to it ("the narrow alcove") and what it physically
+	 * is ("the belfry floor, split by a crack wide enough to show the drop below"), so the player's words
+	 * about the place, or about a feature of it, can be matched to it. {@code phrase} and
+	 * {@code description} are null when no text is authored.
+	 */
+	public record Zone(String alias, String name, String phrase, String description) {
+
+		public Zone(String alias, String name, String phrase) {
+			this(alias, name, phrase, null);
+		}
 	}
 
 	public record Connection(String zoneA, String zoneB) {
@@ -63,11 +73,26 @@ public record ActionInterpretationContext(
 	public record Creature(String alias, String name, String zone, Condition condition) {
 	}
 
-	/** A visible object or hazard: alias, display name and zone alias. */
-	public record Thing(String alias, String name, String zone) {
+	/**
+	 * A known object or hazard: alias, display name and zone alias; for a container, {@code container}
+	 * says whether it is open and what it shows ("closed", "open, holding a Bandage", "open and empty";
+	 * null for anything that is not a container), and {@code reach} how far it is ("here", "one step
+	 * away", "two steps away", "farther", or "no known way").
+	 */
+	public record Thing(String alias, String name, String zone, String container, String reach) {
 	}
 
-	public record Exit(String alias, String zone) {
+	/**
+	 * A known exit: the zone it leaves from, where it leads as far as the player knows (the region
+	 * for the hub's road, a discovered scene, or "an unexplored way"), and how it looks
+	 * ({@code passage}, "a ladder down through the split floor"), so a way described by its look can
+	 * be matched to it. {@code passage} is null when no text is authored.
+	 */
+	public record Exit(String alias, String zone, String leadsTo, String passage) {
+
+		public Exit(String alias, String zone, String leadsTo) {
+			this(alias, zone, leadsTo, null);
+		}
 	}
 
 	public record BodyPartState(BodyPart part, BodySeverity severity) {

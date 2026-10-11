@@ -24,6 +24,8 @@ public final class WorldContentLoader {
 	static final String ARCHETYPES_FILE = "scene-archetypes.json";
 	static final String REGIONS_FILE = "regions.json";
 	static final String FIXED_SCENES_FILE = "fixed-scenes.json";
+	static final String PLACE_TEXTS_FILE = "place-texts.json";
+	static final String CONTAINERS_FILE = "containers.json";
 
 	/** This loader's own strict mapper. */
 	private static final JsonMapper MAPPER = StrictJson.createMapper();
@@ -44,7 +46,14 @@ public final class WorldContentLoader {
 		List<RegionDefinition> regions = readDefinitions(path(REGIONS_FILE), RegionDefinition.class);
 		List<FixedSceneDefinition> fixedScenes = readDefinitions(path(FIXED_SCENES_FILE), FixedSceneDefinition.class);
 		try {
-			return new WorldContentCatalog(elements, archetypes, regions, fixedScenes);
+			// Optional files: a directory without them is structure only (the bundled content has both, and a test says so).
+			PlaceTexts texts = exists(path(PLACE_TEXTS_FILE))
+					? readDocument(path(PLACE_TEXTS_FILE), PlaceTexts.Document.class).toTexts()
+					: PlaceTexts.NONE;
+			ContainerRules containers = exists(path(CONTAINERS_FILE))
+					? readDocument(path(CONTAINERS_FILE), ContainerRules.Document.class).toRules()
+					: ContainerRules.NONE;
+			return new WorldContentCatalog(elements, archetypes, regions, fixedScenes, texts, containers);
 		} catch (IllegalArgumentException | NullPointerException e) {
 			throw new ContentLoadException("Invalid world content in " + resourceDirectory + ": " + e.getMessage(), e);
 		}
@@ -62,6 +71,23 @@ public final class WorldContentLoader {
 		} catch (IOException e) {
 			throw new ContentLoadException("Could not read content resource " + resourcePath, e);
 		}
+	}
+
+	<T> T readDocument(String resourcePath, Class<T> type) {
+		try (InputStream in = WorldContentLoader.class.getClassLoader().getResourceAsStream(resourcePath)) {
+			if (in == null) {
+				throw new ContentLoadException("Missing required content resource: " + resourcePath);
+			}
+			return MAPPER.readValue(in, type);
+		} catch (JacksonException e) {
+			throw new ContentLoadException("Invalid content in " + resourcePath + ": " + e.getOriginalMessage(), e);
+		} catch (IOException e) {
+			throw new ContentLoadException("Could not read content resource " + resourcePath, e);
+		}
+	}
+
+	private static boolean exists(String resourcePath) {
+		return WorldContentLoader.class.getClassLoader().getResource(resourcePath) != null;
 	}
 
 	private String path(String fileName) {

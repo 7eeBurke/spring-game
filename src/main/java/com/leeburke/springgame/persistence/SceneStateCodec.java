@@ -6,6 +6,7 @@ import java.util.UUID;
 import java.util.function.Function;
 
 import com.leeburke.springgame.shared.StrictJson;
+import com.leeburke.springgame.world.ContainerState;
 import com.leeburke.springgame.world.HiddenContentKind;
 import com.leeburke.springgame.world.HiddenContentRef;
 import com.leeburke.springgame.world.SceneEntity;
@@ -34,7 +35,8 @@ import tools.jackson.databind.json.JsonMapper;
  */
 final class SceneStateCodec {
 
-	static final int CURRENT_SCHEMA_VERSION = 1;
+	/** Version 2 adds container states and the zones the player has seen. Version 1 still decodes. */
+	static final int CURRENT_SCHEMA_VERSION = 3;
 
 	private final JsonMapper mapper = StrictJson.createMapper();
 
@@ -44,7 +46,7 @@ final class SceneStateCodec {
 	}
 
 	SceneState decode(UUID sceneId, int schemaVersion, String json) {
-		if (schemaVersion != CURRENT_SCHEMA_VERSION) {
+		if (schemaVersion < 1 || schemaVersion > CURRENT_SCHEMA_VERSION) {
 			throw new PersistedStateException("Scene " + sceneId + ": unsupported scene-state schema version " + schemaVersion
 					+ " (supported: " + CURRENT_SCHEMA_VERSION + ")");
 		}
@@ -53,7 +55,11 @@ final class SceneStateCodec {
 		}
 		SceneStateDocument document;
 		try {
-			document = mapper.readValue(json, SceneStateDocument.class);
+			document = switch (schemaVersion) {
+				case 1 -> mapper.readValue(json, SceneStateDocumentV1.class).upgraded().upgraded();
+				case 2 -> mapper.readValue(json, SceneStateDocumentV2.class).upgraded();
+				default -> mapper.readValue(json, SceneStateDocument.class);
+			};
 		} catch (JacksonException e) {
 			throw new PersistedStateException("Scene " + sceneId + ": invalid scene-state document: " + e.getOriginalMessage(), e);
 		}
@@ -64,8 +70,14 @@ final class SceneStateCodec {
 		}
 	}
 
-	// --- Stored document shape (version 1). Field names are the JSON contract. ---
+	// --- Stored document shape (version 3). Field names are the JSON contract. ---
 
+	/**
+	 * @param allSeen        the player knows the whole scene (every scene stored as version 1); otherwise
+	 *                       {@code seenZones} lists what they know
+	 * @param visitsRecorded where the player has stood is recorded in {@code visitedZones} (not for
+	 *                       scenes stored as versions 1 and 2, whose visits are unknown)
+	 */
 	record SceneStateDocument(
 			List<ZoneDocument> zones,
 			List<ConnectionDocument> connections,
@@ -76,7 +88,54 @@ final class SceneStateCodec {
 			List<PlacedDocument> activeEvents,
 			List<String> environmentFlags,
 			List<HiddenContentDocument> hiddenContent,
+			List<String> discoveredFacts,
+			List<ContainerDocument> containers,
+			boolean allSeen,
+			List<String> seenZones,
+			boolean visitsRecorded,
+			List<String> visitedZones) {
+	}
+
+	record ContainerDocument(String objectId, boolean open, List<String> contents) {
+	}
+
+	/** Version 2: containers and seen zones, but nothing recorded about where the player stood. */
+	record SceneStateDocumentV2(
+			List<ZoneDocument> zones,
+			List<ConnectionDocument> connections,
+			List<PlacedDocument> entities,
+			List<PlacedDocument> objects,
+			List<PlacedDocument> hazards,
+			List<ExitDocument> exits,
+			List<PlacedDocument> activeEvents,
+			List<String> environmentFlags,
+			List<HiddenContentDocument> hiddenContent,
+			List<String> discoveredFacts,
+			List<ContainerDocument> containers,
+			boolean allSeen,
+			List<String> seenZones) {
+		SceneStateDocument upgraded() {
+			return new SceneStateDocument(zones, connections, entities, objects, hazards, exits, activeEvents, environmentFlags,
+					hiddenContent, discoveredFacts, containers, allSeen, seenZones, false, List.of());
+		}
+	}
+
+	/** Version 1: no containers, and nothing recorded about what was seen, so everything is known. */
+	record SceneStateDocumentV1(
+			List<ZoneDocument> zones,
+			List<ConnectionDocument> connections,
+			List<PlacedDocument> entities,
+			List<PlacedDocument> objects,
+			List<PlacedDocument> hazards,
+			List<ExitDocument> exits,
+			List<PlacedDocument> activeEvents,
+			List<String> environmentFlags,
+			List<HiddenContentDocument> hiddenContent,
 			List<String> discoveredFacts) {
+		SceneStateDocumentV2 upgraded() {
+			return new SceneStateDocumentV2(zones, connections, entities, objects, hazards, exits, activeEvents, environmentFlags,
+					hiddenContent, discoveredFacts, List.of(), true, List.of());
+		}
 	}
 
 	record ZoneDocument(String id, String displayName) {
@@ -106,7 +165,12 @@ final class SceneStateCodec {
 				map(state.activeEvents(), v -> new PlacedDocument(v.id(), v.definitionCode(), v.zoneId())),
 				state.environmentFlags(),
 				map(state.hiddenContent(), r -> new HiddenContentDocument(r.kind(), r.localId())),
-				state.discoveredFacts());
+				state.discoveredFacts(),
+				map(state.containers(), c -> new ContainerDocument(c.objectId(), c.open(), c.contents())),
+				state.allSeen(),
+				state.seenZones().orElse(List.of()),
+				state.visitedZones().isPresent(),
+				state.visitedZones().orElse(List.of()));
 	}
 
 	private static SceneState toDomain(SceneStateDocument d) {
@@ -120,7 +184,10 @@ final class SceneStateCodec {
 				map(d.activeEvents(), v -> new SceneEvent(v.id(), v.definitionCode(), v.zoneId())),
 				d.environmentFlags(),
 				map(d.hiddenContent(), r -> new HiddenContentRef(r.kind(), r.localId())),
-				d.discoveredFacts());
+				d.discoveredFacts(),
+				map(d.containers(), c -> new ContainerState(c.objectId(), c.open(), c.contents())),
+				d.allSeen() ? java.util.Optional.empty() : java.util.Optional.of(Objects.requireNonNull(d.seenZones(), "seenZones")),
+				d.visitsRecorded() ? java.util.Optional.of(Objects.requireNonNull(d.visitedZones(), "visitedZones")) : java.util.Optional.empty());
 	}
 
 	private static <A, B> List<B> map(List<A> source, Function<A, B> mapper) {

@@ -345,11 +345,28 @@ Java resolves a validated `ActionIntent` into a `ResolvedOutcome` (see `ARCHITEC
 | `MOVE` (`ADVANCE`/`REPOSITION`) to a zone | no | — | — | automatic (see Movement below) |
 | `MOVE` `HOLD_POSITION` | no | — | — | automatic success, no movement |
 | `COMMUNICATE` | no | — | — | automatic success: the words were said, with no social consequence |
+| `OBSERVE` (search, inspect, listen, watch) | no | — | — | automatic success: the player takes in what is already visible (below) |
+| `MOVE` to an object (`REPOSITION`, `ADVANCE`, `CLOSE_DISTANCE`) | no | — | — | automatic: one step toward it (see Movement below) |
+| `INTERACT` `OPEN` / `PICK_UP` on a container | no | — | — | automatic (see Containers below) |
 
 Everything else is a valid action whose mechanics are not designed yet. It is reported as **mechanics-unavailable**: no roll, no effect, and not a failure. This covers:
 - attacks on objects or hazards, and attacks with any purpose other than `DAMAGE`;
-- movement through exits, relative to entities or objects, or into cover, and `CLOSE_DISTANCE`, `RETREAT`, `CIRCLE`, `CLIMB` and `DISENGAGE`;
-- `INTERACT`, `OBSERVE`, `USE_ABILITY` and `USE_ITEM`.
+- movement relative to entities, or into cover, `CLOSE_DISTANCE` to anything but an object, and `RETREAT`, `CIRCLE`, `CLIMB` and `DISENGAGE`;
+- `INTERACT` other than opening or taking from a container (including opening or taking from anything else), `USE_ABILITY` and `USE_ITEM`.
+
+### Observation
+
+Looking around, searching, inspecting, listening and watching resolve automatically, with no roll and no effect. An observation **reveals nothing hidden**. It describes only what is perceivable now (World Generation, PlayerSceneView): the zone, the zones joined to it, the creatures, objects and hazards in them, and the known ways out, each named only as far as the player knows where it leads. Searching for hidden content is not designed yet. Observation does not provoke an enemy (Enemy turns).
+
+- **A general look** in the same turn as an arrival adds only what the arrival did not already say. A general look that sees exactly what the previous committed look saw is marked unchanged, and told briefly.
+- **A look for somewhere to go** ("I look for a way I haven't gone", "where can I go from here?", "is there a way deeper?", or the `/search` command; recognised by Java from the player's words, `ExplorationQuestion`) is answered from what the player knows of the scene, after this turn's moves: the unexplored ways they know of (and where each leaves from, and which place to go through), the places they know but have not stood in, where they have already been, and the ways they have already used. When none is left, it says that they know of no way they have not tried, never that no other way exists. It never moves the player and reveals nothing hidden or unseen. Looking at one particular thing or way out stays a targeted inspection.
+- **A targeted inspection** (of an object, a zone or a way out) always gives that thing's authored description, and a container's state (closed; open and what it holds), when it is perceivable. Out of sight, it says only that it cannot be made out from here. It never moves the player and is never replaced by a general look.
+
+### Turns where nothing could happen
+
+If no step of an intent reaches RESOLVED (every step was mechanics-unavailable or cancelled), nothing is committed: no turn number, no state change, no chronicle entry and no narration. The request is refused as `ACTION_NOT_SUPPORTED` with reason `NOT_POSSIBLE_YET` and a hint written by Java (`HintWriter`) from the known view, in place phrases rather than labels: where the player is, what is within reach and nearby, and the ways on. The player is told that no turn was spent. When what could not happen was reaching for something out of reach, the reason is `OUT_OF_REACH` instead, with where that thing is (Containers). A resolved step that fails (a missed attack, a failed defense, a blocked move) is gameplay, not a non-event: it commits as usual.
+
+A `REPOSITION` or `ADVANCE` to the zone the player is already in is **idle** (`IdleSteps`). Resolution still counts it as a success, so a following `IF_PREVIOUS_SUCCEEDS` step runs as if the player had just arrived. But it is not meaningful. If an intent has no resolved step other than idle ones, nothing is committed, and the request is refused as `ACTION_NOT_SUPPORTED` with reason `ALREADY_THERE` and the same grounded hint. Holding position (`HOLD_POSITION`) is a deliberate wait and is never idle. An idle step never provokes an enemy.
 
 ### Attack stat by weapon method
 
@@ -402,7 +419,35 @@ A player attack's DC, effectiveness, protection, trauma protection, existing inj
 - The current zone: automatic success, with no movement.
 - Any other zone, including one joined only by an undiscovered passage: automatic failure, with no movement and nothing revealed.
 
+- **Toward an object:** one move along the shortest path of visible connections through known zones toward the object's zone, never more; a longer approach takes one move per step. Already in its zone: success with no move. No known path: automatic failure, with no movement and nothing revealed.
+
 Movement in an earlier step changes the zone that later steps start from.
+
+A free-text journey is grounded before resolution: the destination is checked against the player's own words, and the one step needed to reach an exit in a connected zone is added (AI Contracts, Route grounding). **Crossing into another scene happens only when the player asks for it**; walking forward or approaching stays in the scene, taking at most one local step. Going to an object is one step for "toward"/"closer", and at most two for "go to" or "all the way", stopping early at a zone holding a living creature or a hazard. Commands are resolved exactly as typed.
+
+After a step leaves the scene, the steps after it are cancelled, because they refer to the place left behind. The exception is an untargeted look around: it carries on in the new place, is described from what the player can see there, has no effect and draws no roll.
+
+### Containers
+
+Opening and taking are the only interactions designed. Nothing is rolled: this slice has no locks, stuck lids or forcing, so there is no DC to roll against.
+
+| Action | Where | Result |
+|---|---|---|
+| `OPEN` a closed container | its zone | success: it opens, and what it holds is revealed and persisted |
+| `OPEN` an open container | its zone | success, nothing changes |
+| `OPEN` from another zone | — | cannot begin: unavailable `OUT_OF_REACH` (below) |
+| `PICK_UP` (take) from an open container holding an item | its zone | success: the item moves to the first free tool-belt slot and leaves the container |
+| `PICK_UP` from a closed container | its zone | failure `CLOSED` (opening is never implied) |
+| `PICK_UP` from an empty container | its zone | failure `EMPTY` |
+| `PICK_UP` with a full tool belt (5) | its zone | failure `NO_ROOM` |
+| `PICK_UP` from another zone | — | cannot begin: unavailable `OUT_OF_REACH` (below) |
+| `OPEN` or `PICK_UP` on anything else | — | mechanics-unavailable |
+
+**Out of reach is not a failure.** Reaching for a container in another zone cannot physically begin, so the step is unavailable (`OUT_OF_REACH`), not failed:
+- On its own (or with nothing else meaningful in the intent), the request is refused before anything is committed: `ACTION_NOT_SUPPORTED` with reason `OUT_OF_REACH`, a message saying where the thing is in the world's words ("The crate is in the vestment racks, out of reach from here. Go there first."), and the usual surroundings hint. No turn is spent and no enemy acts. The message uses only the player's known view: an object the player has not seen gets no name or place.
+- After real progress in the same intent ("move toward the crate and see if I can open it" with the crate two passages away), the progress stands: the move commits with its normal consequences, and the open is told as the crate still being out of reach, never as an attempt. Where one step does put the crate in reach (the first find is one passage from the arrival), the same words open it in that turn.
+
+Closed, empty and no room are resolved failures: the character is beside the container and engages with it. A failure commits like a blocked move. Taking an item is told from the item itself (its authored description), and any later step of the same turn sees the container as the take left it. "Take what's inside" targets the container. A container holds at most one item, so taking needs no item choice. Opening and taking are meaningful steps: an enemy may act after them as after any other step. Their effects (`ContainerOpened`, `ItemTaken`) are applied in the turn's mechanics transaction, together with the scene revision check, so a replayed request never opens or grants twice.
 
 ### Multi-step intents
 
@@ -518,18 +563,23 @@ Bundled base weights:
 - the run is still ACTIVE;
 - the player did not leave the scene;
 - no attack is pending;
-- the turn has at least one RESOLVED step that is **not DEFEND**.
+- the turn has at least one RESOLVED step that is **neither DEFEND nor OBSERVE**, and not idle (a move to the zone the player is already in).
 
-So a defense-only turn never provokes another attack, while "defend, then counterattack" does. A turn in which nothing resolved lets no enemy act.
+So a defense-only or observation-only turn never provokes another attack, while "defend, then counterattack" or "look, then move" does. A turn in which nothing resolved lets no enemy act; it is not committed at all (Turns where nothing could happen).
 
-**Which enemy acts.** The actor is chosen round-robin among living, visible enemies of the current scene, in entity-ID order:
+**Who can act.** Only an enemy standing in the **player's zone after this turn's moves** may act. There is no enemy movement or attack range yet, so a creature in another zone (beside it, farther away, or not yet seen) cannot reach the player and never acts; nothing is revealed to explain an attack. Walking into an occupied zone is always possible (route grounding stops *in* the first zone holding a creature), and an enemy there may act in that same turn. An attack that is already pending stays pending and must still be defended, wherever the attacker now is.
+
+**Which enemy acts.** The actor is chosen round-robin among those enemies, in entity-ID order:
 - it is the next one after the persisted cursor, wrapping around;
 - a cursor from another scene resets to the first;
+- if the enemy the cursor names cannot act now (it is elsewhere), the next one by ID acts, or the first;
 - HOLD advances the cursor like an attack.
 
 The decision uses `EnemyBehavior` with the actor's two most recent choices and the turn's enemy random stream.
 
 **When it attacks.** The attack is persisted as the run's pending attack together with its Java cue (`Incoming: ...`). It is never rerolled or re-telegraphed on reload.
+
+**Known limitation.** Player attacks have no range check yet: the player can still attack any visible enemy in the scene, while enemies can only answer from the same zone. Range for both sides, enemy movement and ranged attacks belong to the combat-range work (see `DEFERRED_DECISIONS.md`).
 
 ### Mandatory defense
 

@@ -12,6 +12,8 @@ import com.leeburke.springgame.persistence.GameRunStore;
 import com.leeburke.springgame.persistence.PendingAttackStore;
 import com.leeburke.springgame.persistence.PersistedStateException;
 import com.leeburke.springgame.persistence.WorldStore;
+import com.leeburke.springgame.content.world.WorldContentCatalog;
+import com.leeburke.springgame.game.LegacyContainers;
 import com.leeburke.springgame.run.GameRun;
 import com.leeburke.springgame.world.PlayerLocation;
 import com.leeburke.springgame.world.SceneInstance;
@@ -28,12 +30,15 @@ class GameStateLoader {
 	private final WorldStore world;
 	private final EnemyStore enemies;
 	private final PendingAttackStore pending;
+	private final WorldContentCatalog worldContent;
 
-	GameStateLoader(GameRunStore runs, WorldStore world, EnemyStore enemies, PendingAttackStore pending) {
+	GameStateLoader(GameRunStore runs, WorldStore world, EnemyStore enemies, PendingAttackStore pending,
+			WorldContentCatalog worldContent) {
 		this.runs = Objects.requireNonNull(runs, "runs");
 		this.world = Objects.requireNonNull(world, "world");
 		this.enemies = Objects.requireNonNull(enemies, "enemies");
 		this.pending = Objects.requireNonNull(pending, "pending");
+		this.worldContent = Objects.requireNonNull(worldContent, "worldContent");
 	}
 
 	GameSnapshot load(RunSession session) {
@@ -42,6 +47,7 @@ class GameStateLoader {
 		PlayerLocation location = world.findPlayerLocation(runId)
 				.orElseThrow(() -> new PersistedStateException("Run " + runId + " has no player location"));
 		SceneInstance scene = world.findScene(location.sceneId())
+				.map(found -> LegacyContainers.normalized(found, worldContent.containers()))
 				.orElseThrow(() -> new PersistedStateException("Run " + runId + ": the player's scene is missing"));
 		return new GameSnapshot(session, run.runSeed(), run.playerCharacter(), location, scene,
 				enemies.findEnemies(scene.id()), pending.find(runId));

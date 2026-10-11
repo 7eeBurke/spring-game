@@ -1,0 +1,305 @@
+{
+  "scenes": [
+    {
+      "code": "THE_LAST_LANTERN",
+      "description": "A walled waystation of soot-dark stone, its one lantern burning above the gate.",
+      "zones": {
+        "lantern_hearth": {
+          "phrase": "the hearth beneath the lantern",
+          "description": "A low hearth glows under the hanging lantern, the only warm light for miles."
+        },
+        "chapel_road": {
+          "phrase": "the chapel road",
+          "description": "A rutted road runs from the waystation's gate up a bare slope to the Hollow Chapel, a squat, blackened church whose west doors hang open on one hinge."
+        }
+      },
+      "connections": {
+        "hearth_road": "the waystation's open gate"
+      },
+      "exits": {
+        "chapel_road": [
+          "the sagging west doors into the Hollow Chapel"
+        ]
+      }
+    },
+    {
+      "code": "RUINED_NAVE",
+      "description": "The long body of the church, open to the sky where the roof has fallen in.",
+      "zones": {
+        "nave_entrance": {
+          "phrase": "the west end of the nave",
+          "description": "Cracked flagstones and a stone holy-water stoup, gone dry, just inside the doorway."
+        },
+        "central_aisle": {
+          "phrase": "the central aisle",
+          "description": "A broad aisle running the length of the nave, littered with fallen roof slates."
+        },
+        "collapsed_pews": {
+          "phrase": "the collapsed pews",
+          "description": "Rows of pews crushed flat under a fallen roof beam, splinters everywhere."
+        },
+        "apse": {
+          "phrase": "the apse",
+          "description": "A rounded east end beneath a cracked half-dome, its plaster saints worn faceless."
+        }
+      },
+      "connections": {
+        "entrance_aisle": "the open length of the nave",
+        "aisle_pews": "a gap between the broken pew rows",
+        "aisle_apse": "three worn steps up to the east end"
+      },
+      "exits": {
+        "nave_entrance": [
+          "a doorway in the end wall beside the dry stoup",
+          "a narrow side door half blocked by a fallen beam",
+          "a low arch into the base of the wall",
+          "a crooked doorway behind the dry stoup"
+        ],
+        "apse": [
+          "a low door behind where the altar rail once stood",
+          "a gap broken through the curved wall of the apse",
+          "a narrow stair going down beside the altar step",
+          "a slit of a doorway behind the cracked half-dome"
+        ]
+      }
+    },
+    {
+      "code": "CLOISTER",
+      "description": "A square cloister around an overgrown yard, its arcades half fallen.",
+      "zones": {
+        "cloister_walk": {
+          "phrase": "the covered walk",
+          "description": "A vaulted walk along one side of the cloister, its floor worn smooth by old processions."
+        },
+        "overgrown_garth": {
+          "phrase": "the overgrown yard",
+          "description": "An open yard choked with brambles and dead grass, under a grey sky."
+        },
+        "broken_arcade": {
+          "phrase": "the broken arcade",
+          "description": "A row of arches, several collapsed into heaps of rubble."
+        }
+      },
+      "connections": {
+        "walk_garth": "a gap in the low wall onto the yard",
+        "walk_arcade": "the corner where the walk turns",
+        "garth_arcade": "a path trodden through the brambles"
+      },
+      "exits": {
+        "cloister_walk": [
+          "an iron-bound door in the inner wall",
+          "a plain door at the end of the walk",
+          "a low archway half filled with rubble",
+          "a narrow door where the vaulting has sagged"
+        ],
+        "broken_arcade": [
+          "a passage beneath the last standing arch",
+          "a gap where two arches have fallen together",
+          "a doorway behind a heap of fallen stone",
+          "a dark opening under a leaning arch"
+        ]
+      }
+    },
+    {
+      "code": "SACRISTY",
+      "description": "A cramped sacristy, its plaster flaking, smelling of damp cloth and old wax.",
+      "zones": {
+        "vestry_door": {
+          "phrase": "the threshold of the sacristy",
+          "description": "A narrow stone threshold just inside the sacristy, worn hollow in the middle."
+        },
+        "vestment_racks": {
+          "phrase": "the vestment racks",
+          "description": "Rows of wooden racks hung with rotting vestments that brush your face as you pass."
+        },
+        "locked_alcove": {
+          "phrase": "the narrow alcove",
+          "description": "A cramped alcove set into the back wall, deep in shadow."
+        }
+      },
+      "connections": {
+        "door_racks": "the cramped room beyond the threshold",
+        "racks_alcove": "a gap at the back of the racks"
+      },
+      "exits": {
+        "vestry_door": [
+          "a narrow doorway in the sacristy wall",
+          "a low door behind a fallen cupboard",
+          "a curtained opening, the curtain rotted to threads",
+          "a cramped opening where a panel of the wall has rotted through"
+        ]
+      }
+    },
+    {
+      "code": "OSSUARY",
+      "description": "A cold bone-house beneath the church, its walls built from the dead.",
+      "zones": {
+        "bone_stair": {
+          "phrase": "the bone stair",
+          "description": "Steep stone steps, their edges set with rows of femurs."
+        },
+        "skull_niches": {
+          "phrase": "the wall of skull niches",
+          "description": "A long chamber whose walls are honeycombed with niches, each holding a skull."
+        },
+        "charnel_pit": {
+          "phrase": "the charnel pit",
+          "description": "A sunken pit heaped with loose bones, the smell thick and sweet."
+        },
+        "warden_post": {
+          "phrase": "the warden's post",
+          "description": "A cramped guard post with a stone bench and a rusted lamp hook."
+        }
+      },
+      "connections": {
+        "stair_niches": "the foot of the stair",
+        "niches_pit": "a crumbling edge down into the pit",
+        "niches_post": "an archway at the far end of the niches"
+      },
+      "exits": {
+        "bone_stair": [
+          "the top of the bone stair",
+          "a crawlway between the stair's lowest steps",
+          "a side door set into the wall of bones",
+          "an opening behind a stack of skulls at the stair's foot"
+        ],
+        "warden_post": [
+          "a heavy door behind the warden's bench",
+          "a barred gate standing open beside the lamp hook",
+          "a dark tunnel leading on past the post",
+          "a narrow way behind the rusted lamp hook"
+        ]
+      }
+    },
+    {
+      "code": "BELL_PASSAGE",
+      "description": "A climbing passage toward the bell tower, cold air spilling down from above.",
+      "zones": {
+        "bell_landing": {
+          "phrase": "the bell landing",
+          "description": "A small landing where a frayed bell rope hangs down the stairwell."
+        },
+        "rope_gallery": {
+          "phrase": "the rope gallery",
+          "description": "A narrow wooden gallery strung with ropes and pulleys, creaking underfoot."
+        },
+        "cracked_belfry": {
+          "phrase": "the cracked belfry",
+          "description": "The belfry floor, split by a crack wide enough to show the drop below."
+        }
+      },
+      "connections": {
+        "landing_gallery": "a short ladder up from the landing",
+        "gallery_belfry": "the far end of the gallery"
+      },
+      "exits": {
+        "bell_landing": [
+          "a stairwell leading down",
+          "a low door off the landing",
+          "a narrow gap behind the hanging bell rope",
+          "a doorway half hidden behind a broken ladder"
+        ],
+        "cracked_belfry": [
+          "a hatch in the belfry wall",
+          "a ladder down through the split floor",
+          "an opening where the louvres have fallen",
+          "a gap beside the great bell's beam"
+        ]
+      }
+    },
+    {
+      "code": "RELIQUARY",
+      "description": "A treasury of relics, its cases broken and its shelves stripped.",
+      "zones": {
+        "reliquary_gate": {
+          "phrase": "the threshold of the reliquary",
+          "description": "A threshold behind a bent iron grille that no longer closes."
+        },
+        "relic_shelves": {
+          "phrase": "the relic shelves",
+          "description": "Tall shelves of empty reliquaries and shattered glass cases."
+        },
+        "sealed_reliquary": {
+          "phrase": "the inner reliquary",
+          "description": "A small inner room lined with niches, its wax seals long broken."
+        },
+        "side_chapel": {
+          "phrase": "the side chapel",
+          "description": "A tiny chapel with a single cold altar and a soot-blackened ceiling."
+        }
+      },
+      "connections": {
+        "gate_shelves": "the aisle between the shelves",
+        "shelves_sealed": "a low arch at the back of the shelves",
+        "shelves_side": "a doorway in the side wall"
+      },
+      "exits": {
+        "reliquary_gate": [
+          "a doorway beside the iron grille",
+          "a second, smaller door in the grille's frame",
+          "a passage between two toppled cases",
+          "a low opening behind an overturned reliquary"
+        ],
+        "side_chapel": [
+          "a narrow passage behind the altar",
+          "a door in the soot-blackened wall",
+          "a stair leading down beside the altar",
+          "a doorway behind the soot-dark altar cloth"
+        ]
+      }
+    },
+    {
+      "code": "GUARDIAN_SANCTUM",
+      "description": "The innermost sanctum, high and ember-lit, where something still keeps watch.",
+      "zones": {
+        "sanctum_threshold": {
+          "phrase": "the threshold of the sanctum",
+          "description": "A wide threshold before the sanctum, its floor scorched in a ring."
+        },
+        "guardian_dais": {
+          "phrase": "the raised dais",
+          "description": "A raised stone dais at the heart of the sanctum."
+        },
+        "pillared_flank": {
+          "phrase": "the pillared side",
+          "description": "A row of massive pillars along one side of the sanctum."
+        },
+        "ember_choir": {
+          "phrase": "the ember choir",
+          "description": "Choir stalls glowing with embers that never quite go out."
+        }
+      },
+      "connections": {
+        "threshold_dais": "the open floor before the dais",
+        "threshold_flank": "the shadow along the wall",
+        "dais_flank": "the space between the pillars",
+        "dais_choir": "steps down behind the dais"
+      },
+      "exits": {
+        "sanctum_threshold": [
+          "the great doorway into the sanctum",
+          "a narrow door beside the great doorway",
+          "a low passage under the threshold's lintel",
+          "a crack in the threshold wall wide enough to pass"
+        ]
+      }
+    }
+  ],
+  "entrances": {
+    "RUINED_NAVE": "the sagging west doors you came in by, back out to the chapel road",
+    "BELL_PASSAGE": "the chapel's sagging west doors beneath the tower, back out to the chapel road"
+  },
+  "elements": {
+    "WOODEN_PEW": "A heavy wooden pew, its back carved with worn saints.",
+    "STONE_PILLAR": "A thick stone pillar, scarred where something has struck it.",
+    "ALTAR": "A plain stone altar, its cloth long rotted away.",
+    "WOODEN_DOOR": "An old wooden door, swollen in its frame.",
+    "CHAIN": "A length of heavy iron chain, bolted to the wall.",
+    "CORPSE": "A dead pilgrim, long past help, lying where they fell.",
+    "CRATE": "A wooden crate with a loose lid, the kind used to store church candles.",
+    "UNSTABLE_CEILING": "Cracked ceiling stones, sagging and ready to fall.",
+    "FIRE": "A low fire that burns without fuel.",
+    "PRESSURE_PLATE": "A flagstone that sits a finger's width higher than the rest.",
+    "COLLAPSING_FLOOR": "Floorboards gone soft and sagging over a drop."
+  }
+}

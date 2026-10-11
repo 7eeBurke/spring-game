@@ -20,6 +20,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import com.leeburke.springgame.action.ActionFixtures;
 import com.leeburke.springgame.action.ActionIntent;
 import com.leeburke.springgame.action.ActionPayload;
+import com.leeburke.springgame.action.ActionTarget;
 import com.leeburke.springgame.action.StepRelation;
 import com.leeburke.springgame.action.resolution.ResolutionFixtures.FixedRolls;
 import com.leeburke.springgame.action.resolution.ResolutionFixtures.Setup;
@@ -84,7 +85,7 @@ class MultiStepResolutionTest {
 	@Test
 	void conditionalIsCancelledAfterAnUnavailableStep() {
 		ResolvedOutcome outcome = setup.resolve(related(Optional.empty(), List.of(StepRelation.IF_PREVIOUS_SUCCEEDS),
-				ActionFixtures.search(), slash()), new FixedRolls());
+				new ActionPayload.UseItemPayload(ActionFixtures.SALVE, ActionTarget.unspecified()), slash()), new FixedRolls());
 
 		assertThat(outcome.steps().get(1).cancellation()).contains(CancellationReason.PREVIOUS_STEP_NOT_SUCCESSFUL);
 		assertThat(outcome.overall()).isEqualTo(OverallResult.MECHANICS_UNAVAILABLE);

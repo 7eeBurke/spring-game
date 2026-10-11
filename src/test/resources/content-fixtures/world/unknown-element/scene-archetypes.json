@@ -1,2 +1,2 @@
-[ { "code": "ROOM", "displayName": "Room", "zones": [ { "id": "a", "displayName": "A" } ], "connections": [], "exitZones": ["a"],
+[ { "code": "ROOM", "displayName": "Room", "zones": [ { "id": "a", "displayName": "A" } ], "connections": [], "exitZones": ["a"], "entranceZone": "a",
     "slots": [ { "id": "s", "kind": "OBJECT", "candidates": ["GHOST_BARREL"], "zones": ["a"], "chance": 50, "hiddenChance": 0 } ] } ]

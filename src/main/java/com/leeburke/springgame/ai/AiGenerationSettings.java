@@ -7,9 +7,16 @@ import java.util.Optional;
 /**
  * Per-role generation settings. {@code model} may be blank when AI is not configured; a provider
  * then reports {@link AiFailureKind#NOT_CONFIGURED}. Temperature is sent only when configured,
- * because some models reject it. Output is never assumed deterministic, whatever the settings.
+ * because some models reject it; so is {@code reasoningEffort} (for reasoning models only, such as
+ * "none" for a fast narrator). Output is never assumed deterministic, whatever the settings.
  */
-public record AiGenerationSettings(String model, int maxOutputTokens, Duration timeout, Optional<Double> temperature) {
+public record AiGenerationSettings(String model, int maxOutputTokens, Duration timeout, Optional<Double> temperature,
+		Optional<String> reasoningEffort) {
+
+	/** Settings with no reasoning effort (every non-reasoning model). */
+	public AiGenerationSettings(String model, int maxOutputTokens, Duration timeout, Optional<Double> temperature) {
+		this(model, maxOutputTokens, timeout, temperature, Optional.empty());
+	}
 
 	public AiGenerationSettings {
 		Objects.requireNonNull(model, "model");
@@ -21,5 +28,7 @@ public record AiGenerationSettings(String model, int maxOutputTokens, Duration t
 			throw new IllegalArgumentException("timeout must be positive");
 		}
 		Objects.requireNonNull(temperature, "temperature");
+		Objects.requireNonNull(reasoningEffort, "reasoningEffort");
+		reasoningEffort = reasoningEffort.map(String::strip).filter(effort -> !effort.isEmpty());
 	}
 }

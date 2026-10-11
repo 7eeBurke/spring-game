@@ -305,6 +305,8 @@ Action interpretation and AI roles receive `PlayerSceneView`, never authoritativ
 - `scene_instance.state_schema_version` identifies the document structure (currently 1). It is not content or rules versioning. An unsupported version fails clearly; migration between document versions is deferred.
 - Decoding is strict: malformed JSON, unknown, missing or null fields, invalid enum values and documents violating `SceneState` invariants all fail as persisted-state corruption naming the scene. A corrupt document never becomes a default scene.
 
+Scene state documents are at **version 3**, recorded in each scene's `state_schema_version` column. Version 2 added `containers` and `seenZones`; version 3 adds `visitsRecorded` and `visitedZones`. `SceneStateCodec` still decodes version 1 (a fully known scene with no container state; `LegacyContainers` then treats its crates as closed and empty) and version 2 (visits unknown); every write is version 3.
+
 ### Scene Revisions
 
 - `scene_instance.revision` is the JPA `@Version` column, used only for mutable scene state. A new scene starts at 0; every state update increments it.
@@ -405,7 +407,7 @@ Each turn request is a `run_turn` row keyed by `(run_id, Idempotency-Key)`, with
    - It then checks the run status, the state version (a mismatch is stored as `STALE`) and the per-run turn limit.
    - Finally it inserts `INTERPRETING` with a lease owner and expiry. A partial unique index allows **at most one unfinished turn per run**.
 2. **Interpret,** with no transaction open.
-   - Deterministic rejections are stored as `REJECTED`, fenced on the lease owner.
+   - Deterministic rejections are stored as `REJECTED`, fenced on the lease owner. They include a free-text journey that route grounding cannot settle (`UNCLEAR_DESTINATION` with choices), and an unclear answer it cannot ground (`UNCLEAR`).
    - A transient AI failure deletes the row, so the key can be retried.
    - While an attack is pending, an intent that does not open with a DEFEND against it is `DEFENSE_REQUIRED`.
 3. **Mechanics,** in one transaction that holds `SELECT ... FOR UPDATE` on `run_session`:
@@ -413,6 +415,7 @@ Each turn request is a `run_turn` row keyed by `(run_id, Idempotency-Key)`, with
    - The state version must be unchanged.
    - Resolve with `TurnRandom.player(runSeed, turn)`.
    - Enforce `DefenseGate`: if the defense did not resolve, roll back.
+   - If no step resolved at all, or only idle moves to the current zone resolved, roll back and store `REJECTED` (`ACTION_NOT_SUPPORTED`, `NOT_POSSIBLE_YET` or `ALREADY_THERE`): no turn, no narration call.
    - Apply effects through `EffectApplier`.
    - Travel through `ExitTraversal`.
    - Decide terminal status.
@@ -425,6 +428,10 @@ Each turn request is a `run_turn` row keyed by `(run_id, Idempotency-Key)`, with
    - In a short transaction fenced on the narration owner, store the attack narration and the response, and mark the turn `COMPLETED`.
 
    A failure while narrating releases the narration lease; a hard crash relies on its expiry. The mechanics stay committed either way, and the next request (same key or any new key) finalises from the stored summary without resolving or applying anything again.
+
+### Exploration state in a turn
+
+Each committed turn updates the scene at most once, with the revision check: the zones newly seen (on arrival and after every move) and any container that was opened or emptied. A taken item is written to the next free tool-belt slot (`GameRunStore.addToolBeltItem`) in the same transaction. A replayed request returns the stored response and applies nothing again, so an item is never granted twice.
 
 ### Idempotency and Replay
 
@@ -480,12 +487,16 @@ Errors are `{"error": {code, message, reason?, hint?}}`:
 | 401 | `UNAUTHORIZED` |
 | 404 | `RUN_NOT_FOUND` |
 | 409 | `STALE_VIEW`, `REQUEST_IN_PROGRESS`, `IDEMPOTENCY_KEY_REUSED`, `TOKEN_IN_USE`, `RUN_FINISHED`, `RUN_INITIALIZING` |
-| 422 | `ACTION_NOT_SUPPORTED`, `INTERPRETATION_FAILED` (reason `AI_UNAVAILABLE` or `INVALID_OUTPUT`), `INVALID_COMMAND`, `DEFENSE_REQUIRED`, `DEFENSE_NOT_RESOLVED` |
+| 422 | `ACTION_NOT_SUPPORTED` (reason `NOT_POSSIBLE_YET` when no step could resolve, `ALREADY_THERE` when the only resolved steps were moves to the zone the player is already in, `AT_THRESHOLD` when a walk onward would have to cross into another place the player did not ask to enter; its message asks whether to go through; `OUT_OF_REACH` when the only thing asked was to reach for something in another zone; its message says where it is), `INTERPRETATION_FAILED` (reason `AI_UNAVAILABLE`, `INVALID_OUTPUT`, `UNCLEAR` or `UNCLEAR_DESTINATION`), `INVALID_COMMAND`, `DEFENSE_REQUIRED`, `DEFENSE_NOT_RESOLVED` |
 | 429 | `RATE_LIMITED` |
 | 500 | `INTERNAL_ERROR` |
 | 503 | `SERVICE_UNAVAILABLE` |
 
-There are no stack traces or provider text in any error.
+There are no stack traces or provider text in any error. The hints for `ACTION_NOT_SUPPORTED` (including `NOT_POSSIBLE_YET`) and for `INTERPRETATION_FAILED` with `INVALID_OUTPUT`, `UNCLEAR` or `UNCLEAR_DESTINATION` are written by Java (`HintWriter`) from the known view, in place phrases rather than map labels ("You're at the hearth beneath the lantern. From here you can reach the chapel road. ..."). A refused request spends no turn, and the client says so ("No turn spent").
+
+Turn narration has three sources: `AI`, `FALLBACK` (the model failed or AI is off) and `DIRECT` (the game told it by design, with no model call, for a look that finds nothing changed). The source is stored with the turn's response and returned by the view and the chronicle; only `FALLBACK` is labelled as plainly told.
+
+`GameView` carries `objective`, the lore's opening direction ("Follow Chapel Road to the Hollow Chapel, and discover what guards its depths."). It is a direction, not a quest tracker. Each exit carries `leadsTo` (World Generation, Exit labels). The chronicle's opening carries the same `objective`. Both are derived on read, so earlier runs show them without rewriting stored introductions or chronicles.
 
 ### Abuse Limits
 

@@ -46,7 +46,7 @@ export const SAMPLE_SCENE: SceneView = {
   creatures: [{ alias: 'entity_1', name: 'Bone Warden', zone: 'zone_2', condition: 'ACTIVE' }],
   objects: [{ alias: 'object_1', name: 'Fallen Bell', zone: 'zone_2' }],
   hazards: [{ alias: 'hazard_1', name: 'Rotten Floorboards', zone: 'zone_3' }],
-  exits: [{ alias: 'exit_1', zone: 'zone_1' }, { alias: 'exit_2', zone: 'zone_3' }],
+  exits: [{ alias: 'exit_1', zone: 'zone_1', leadsTo: 'the way to the Ossuary' }, { alias: 'exit_2', zone: 'zone_3', leadsTo: 'an unexplored way' }],
 };
 
 export const SAMPLE_PLACE = { region: 'Hollow Chapel', scene: 'Bell Passage', zone: { alias: 'zone_1', name: 'Bell Landing' } };

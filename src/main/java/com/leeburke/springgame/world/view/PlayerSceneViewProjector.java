@@ -9,6 +9,7 @@ import com.leeburke.springgame.world.HiddenContentKind;
 import com.leeburke.springgame.world.SceneState;
 import com.leeburke.springgame.world.SceneZone;
 import com.leeburke.springgame.world.view.PlayerSceneView.KnownExit;
+import com.leeburke.springgame.world.view.PlayerSceneView.VisibleContainer;
 import com.leeburke.springgame.world.view.PlayerSceneView.VisibleConnection;
 import com.leeburke.springgame.world.view.PlayerSceneView.VisibleEntity;
 import com.leeburke.springgame.world.view.PlayerSceneView.VisibleHazard;
@@ -91,7 +92,14 @@ public final class PlayerSceneViewProjector {
 				.map(x -> new KnownExit(x.id(), x.zoneId()))
 				.toList();
 
+		Set<String> objectIds = new HashSet<>();
+		objects.forEach(o -> objectIds.add(o.id()));
+		List<VisibleContainer> containers = state.containers().stream()
+				.filter(c -> objectIds.contains(c.objectId()))
+				.map(c -> new VisibleContainer(c.objectId(), c.open(), c.open() ? c.contents() : List.of()))
+				.toList();
+
 		return new PlayerSceneView(currentZoneId, zones, connections, entities, objects, hazards, exits,
-				state.discoveredFacts());
+				state.discoveredFacts(), containers);
 	}
 }

@@ -75,7 +75,11 @@ class GameContentLoaderTest {
 			"CROWBAR,Crowbar,UTILITY",
 			"LOCKPICKS,Lockpicks,UTILITY" })
 	void bundledItemsHaveExpectedCategories(String code, String name, ItemCategory category) {
-		assertThat(bundled.findItem(code)).contains(new ItemDefinition(code, name, category));
+		assertThat(bundled.findItem(code)).hasValueSatisfying(item -> {
+			assertThat(item.displayName()).isEqualTo(name);
+			assertThat(item.category()).isEqualTo(category);
+			assertThat(item.description()).as("how it looks in the hand").isNotBlank();
+		});
 	}
 
 	@Test

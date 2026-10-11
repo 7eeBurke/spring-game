@@ -136,6 +136,16 @@ class OpenAiProviderTest {
 	}
 
 	@Test
+	void reasoningEffortIsSentOnlyWhenConfigured() {
+		assertThat(OpenAiProvider.textParams(textRequest()).reasoning()).isEmpty();
+		AiGenerationSettings fast = new AiGenerationSettings("gpt-5.4-mini", 400, Duration.ofSeconds(1), Optional.empty(),
+				Optional.of("none"));
+		ResponseCreateParams params = OpenAiProvider.textParams(new AiTextRequest(AiRole.OUTCOME_NARRATOR, 6, "I", "{}", fast));
+		assertThat(params.reasoning().orElseThrow().effort().orElseThrow().toString()).isEqualTo("none");
+		assertThat(params.temperature()).isEmpty();
+	}
+
+	@Test
 	void structuredParamsUseAStrictJsonSchema() {
 		ResponseFormatTextJsonSchemaConfig format = OpenAiProvider.structuredParams(structuredRequest()).text().orElseThrow()
 				.format().orElseThrow().jsonSchema().orElseThrow();

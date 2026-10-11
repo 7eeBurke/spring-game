@@ -3,7 +3,12 @@
 
 export type RunStatus = 'INITIALIZING' | 'ACTIVE' | 'DEAD' | 'VICTORIOUS';
 export type Awaiting = 'ACTION' | 'DEFENSE' | 'NONE';
-export type NarrationSource = 'AI' | 'FALLBACK';
+/**
+ * AI: told by the storyteller. FALLBACK: told plainly because the storyteller failed or was off.
+ * DIRECT: told by the game by design (nothing for a storyteller to add, such as a look that finds
+ * nothing changed); not a failure.
+ */
+export type NarrationSource = 'AI' | 'FALLBACK' | 'DIRECT';
 
 export interface NarrationView {
   text: string;
@@ -33,9 +38,20 @@ export interface SceneView {
   zones: ZoneView[];
   connections: { zoneA: string; zoneB: string }[];
   creatures: { alias: string; name: string; zone: string; condition: 'ACTIVE' | 'FALLEN' }[];
-  objects: { alias: string; name: string; zone: string }[];
-  hazards: { alias: string; name: string; zone: string }[];
-  exits: { alias: string; zone: string }[];
+  /**
+   * container: a container's state as the player can see it ("closed", "open, holding a Bandage",
+   * "open and empty"), null otherwise. reach: "here", "one step away", "two steps away", "farther",
+   * "no known way". Both are absent in data stored before they existed.
+   */
+  objects: { alias: string; name: string; zone: string; container?: string | null; reach?: string }[];
+  hazards: { alias: string; name: string; zone: string; container?: string | null; reach?: string }[];
+  /** leadsTo: where the exit goes, as far as the player knows ("an unexplored way" otherwise). */
+  exits: { alias: string; zone: string; leadsTo: string }[];
+  /**
+   * What the player knows is left to explore here: ways out not yet taken (exit aliases) and places
+   * not yet stood in (zone aliases; empty when visits were not recorded). Absent in older data.
+   */
+  leads?: { unexploredExits: string[]; unvisitedZones: string[]; visitsRecorded: boolean };
 }
 
 export interface PendingAttackView {
@@ -52,6 +68,8 @@ export interface GameView {
   awaiting: Awaiting;
   finalizing: boolean;
   introduction: NarrationView | null;
+  /** The run's opening direction, from the lore. */
+  objective: string;
   character: CharacterView;
   location: { region: string | null; scene: string; zone: ZoneView };
   scene: SceneView;
@@ -72,6 +90,7 @@ export interface ApiErrorBody {
 
 export interface ChronicleOpening {
   introduction: NarrationView | null;
+  objective: string;
   scene: string;
   zone: string;
 }
@@ -98,6 +117,8 @@ export interface ChronicleTurn {
   /** Null for turns recorded before the player's wording was kept. */
   action: ChronicleAction | null;
   enteredScene: ChroniclePlace | null;
+  /** The zone moved to within the same scene (its map label), when the player walked somewhere. */
+  movedTo?: string | null;
   /** Null while the turn's narration is still being finalised. */
   narration: NarrationView | null;
   narrationPending: boolean;
@@ -115,4 +136,23 @@ export interface ChronicleView {
   turns: ChronicleTurn[];
   /** Cursor for the next older page, or null at the start. */
   nextBefore: number | null;
+}
+
+// Stage 14 turn result (com.leeburke.springgame.game.view.TurnResponse).
+
+export interface TurnResponse {
+  turnNumber: number;
+  overall: string;
+  narration: NarrationView;
+  changes: { playerHpLost: number; enemiesDefeated: string[]; movedTo: string | null; enteredScene: string | null };
+  /** Null when no enemy acted. */
+  enemyTurn: { attacker: string; action: 'ATTACK' | 'HOLD' } | null;
+  /** The view after the turn. */
+  view: GameView;
+}
+
+/** The exact body of a turn request; retried byte-for-byte with its original key. */
+export interface TurnRequestBody {
+  input: string;
+  stateVersion: number;
 }

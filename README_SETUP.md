@@ -143,14 +143,16 @@ $env:GAME_AI_MODEL = "<an OpenAI model ID that supports structured outputs>"
 |---|---|---|
 | `GAME_AI_ENABLED` | `false` | Switches the AI roles on |
 | `OPENAI_API_KEY` | empty | API key. Never commit it; it is never logged |
-| `GAME_AI_MODEL` | empty | Model ID for all roles. There is deliberately no default |
+| `GAME_AI_MODEL` | empty | Model ID for every role except the Outcome Narrator (the interpreter's, today `gpt-4.1-mini`). There is deliberately no default |
+| `GAME_AI_NARRATOR_MODEL` | `gpt-5.4-mini` | The Outcome Narrator's model, chosen by the narrator benchmark. Set `gpt-4.1-mini` to roll back |
+| `GAME_AI_NARRATOR_REASONING_EFFORT` | `none` | The narrator's reasoning effort (sent only to reasoning models; ignored for a gpt-4 model) |
 | `OPENAI_BASE_URL` | the SDK default | Optional API base URL |
 
 If AI is enabled but the key or model is missing, the application still starts. It logs one warning naming the missing variable, and the roles use their fallbacks.
 
 Further optional settings go in `application.properties` or as environment variables:
 - `game.ai.timeout` (default `20s`) and `game.ai.max-retries` (default `1`).
-- Per role: `game.ai.roles.<role>.model`, `.max-output-tokens` and `.temperature`. The roles are `action-interpreter`, `outcome-narrator`, `enemy-attack-narrator` and `character-introduction`.
+- Per role: `game.ai.roles.<role>.model`, `.max-output-tokens`, `.temperature` and `.reasoning-effort`. The roles are `action-interpreter`, `outcome-narrator`, `enemy-attack-narrator` and `character-introduction`.
 
 Default output-token limits are 1500 for the interpreter, 400 for the outcome narrator, 200 for the enemy attack narrator and 600 for the introduction. Reasoning models spend output tokens on reasoning, so raise these if responses come back truncated; a truncated response falls back.
 

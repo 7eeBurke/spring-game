@@ -1,4 +1,5 @@
 import type { ChronicleOpening, ChronicleTurn, ChronicleView } from '../api/types';
+import { betterTurn } from './freshness';
 
 /**
  * The part of a run's story loaded so far: always one contiguous window of turns, ending at the
@@ -18,11 +19,17 @@ export interface ChronicleState {
 
 export const EMPTY_CHRONICLE: ChronicleState = { opening: null, turns: [], nextBefore: null, reachedStart: false, fresh: new Set() };
 
-/** Union by turnNumber; on a clash the newer copy wins (a pending turn becomes its narrated copy). */
+/**
+ * Union by turnNumber. On a clash the incoming copy wins (a provisional entry becomes the
+ * authoritative one, a pending turn its narrated copy), but a copy never loses narration it had.
+ */
 export function mergeTurns(existing: readonly ChronicleTurn[], incoming: readonly ChronicleTurn[]): ChronicleTurn[] {
   const byNumber = new Map<number, ChronicleTurn>();
   for (const turn of existing) byNumber.set(turn.turnNumber, turn);
-  for (const turn of incoming) byNumber.set(turn.turnNumber, turn);
+  for (const turn of incoming) {
+    const known = byNumber.get(turn.turnNumber);
+    byNumber.set(turn.turnNumber, known ? betterTurn(known, turn) : turn);
+  }
   return [...byNumber.values()].sort((a, b) => a.turnNumber - b.turnNumber);
 }
 

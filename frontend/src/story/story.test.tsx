@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { sampleView } from '../test/fakeApi';
 import { Composer, DefenseBanner } from './Composer';
@@ -26,6 +26,12 @@ describe('story passages', () => {
     expect(toParagraphs('One.\n\nTwo.\nThree.\n\n\n')).toEqual(['One.', 'Two.', 'Three.']);
     const { container } = render(<NarrationPassage narration={{ text: 'First.\n\nSecond.', source: 'AI' }} />);
     expect(container.querySelectorAll('p')).toHaveLength(2);
+  });
+
+  it('tell a direct, by-design narration without calling it a failure', () => {
+    render(<NarrationPassage narration={{ text: 'Nothing has changed around you.', source: 'DIRECT' }} />);
+    expect(screen.getByText('Nothing has changed around you.')).toBeInTheDocument();
+    expect(screen.queryByText(/storyteller was unavailable/)).toBeNull();
   });
 
   it('mark a deterministic fallback honestly', () => {
@@ -81,7 +87,7 @@ describe('header, composer and panels', () => {
         zones: [{ alias: 'zone_1', name: 'Bell Landing' }, { alias: 'zone_2', name: 'Rope Gallery' }],
         connections: [{ zoneA: 'zone_1', zoneB: 'zone_2' }],
         creatures: [{ alias: 'entity_1', name: 'Bone Warden', zone: 'zone_2', condition: 'FALLEN' }],
-        objects: [], hazards: [], exits: [{ alias: 'exit_1', zone: 'zone_1' }],
+        objects: [], hazards: [], exits: [{ alias: 'exit_1', zone: 'zone_1', leadsTo: 'an unexplored way' }],
       },
     });
     const { container } = render(
@@ -98,5 +104,61 @@ describe('header, composer and panels', () => {
     expect(screen.getByText('fallen')).toBeInTheDocument();
     expect(screen.getByText('Open to Rope Gallery.')).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/exit_1|entity_1|zone_1/);
+  });
+
+  it('show what each thing is and how far it is, never what a closed crate holds', () => {
+    const view = sampleView({
+      scene: {
+        zones: [{ alias: 'zone_1', name: 'Vestry Threshold' }, { alias: 'zone_2', name: 'Vestment Racks' }],
+        connections: [{ zoneA: 'zone_1', zoneB: 'zone_2' }], creatures: [], hazards: [], exits: [],
+        objects: [
+          { alias: 'object_1', name: 'Crate', zone: 'zone_1', container: 'open, holding a Bandage', reach: 'here' },
+          { alias: 'object_2', name: 'Crate', zone: 'zone_2', container: 'closed', reach: 'one step away' },
+          { alias: 'object_3', name: 'Broken Pew', zone: 'zone_2' },
+        ],
+      },
+    });
+    const { container } = render(<ScenePanel scene={view.scene} currentZone={{ alias: 'zone_1', name: 'Vestry Threshold' }} />);
+    const around = screen.getByRole('heading', { name: 'Around you' }).closest('section')!;
+    const rows = within(around).getAllByRole('listitem').map((li) => li.textContent);
+    expect(rows).toEqual([
+      'Crate — open, holding a Bandagewithin reach',
+      'Crate — closedone step away',
+      'Broken PewVestment Racks',
+    ]);
+    expect(container.textContent).not.toMatch(/object_\d|zone_\d/);
+  });
+
+  it('list what is not yet explored, and say plainly when nothing known is left', () => {
+    const scene = {
+      zones: [{ alias: 'zone_1', name: 'Nave Entrance' }, { alias: 'zone_2', name: 'Central Aisle' }, { alias: 'zone_3', name: 'Apse' }],
+      connections: [{ zoneA: 'zone_1', zoneB: 'zone_2' }, { zoneA: 'zone_2', zoneB: 'zone_3' }], creatures: [], objects: [], hazards: [],
+      exits: [{ alias: 'exit_1', zone: 'zone_1', leadsTo: 'the way to The Last Lantern' }, { alias: 'exit_2', zone: 'zone_3', leadsTo: 'an unexplored way' }],
+      leads: { unexploredExits: ['exit_2'], unvisitedZones: ['zone_3'], visitsRecorded: true },
+    };
+    const { rerender } = render(<ScenePanel scene={sampleView({ scene }).scene} currentZone={{ alias: 'zone_2', name: 'Central Aisle' }} />);
+    const section = () => screen.getByRole('heading', { name: 'Not yet explored' }).closest('section')!;
+    expect(within(section()).getAllByRole('listitem').map((li) => li.textContent))
+      .toEqual(['An unexplored wayfrom Apse', 'Apsenot yet visited']);
+    expect(section()).not.toHaveTextContent('Last Lantern');
+
+    rerender(<ScenePanel scene={sampleView({ scene: { ...scene, leads: { unexploredExits: [], unvisitedZones: [], visitsRecorded: true } } }).scene}
+      currentZone={{ alias: 'zone_2', name: 'Central Aisle' }} />);
+    expect(section()).toHaveTextContent('Nothing you know of here is left untried.');
+  });
+
+  it('name each way out only as the server labels it, and show the objective', () => {
+    const view = sampleView({
+      scene: {
+        zones: [{ alias: 'zone_1', name: 'Chapel Road' }, { alias: 'zone_2', name: 'Lantern Hearth' }],
+        connections: [{ zoneA: 'zone_1', zoneB: 'zone_2' }], creatures: [], objects: [], hazards: [],
+        exits: [{ alias: 'exit_1', zone: 'zone_1', leadsTo: 'the road to the Hollow Chapel' }],
+      },
+    });
+    render(<ScenePanel scene={view.scene} currentZone={{ alias: 'zone_2', name: 'Lantern Hearth' }} objective={view.objective} />);
+    const section = (title: string) => screen.getByRole('heading', { name: title }).closest('section')!;
+    expect(section('Ways out')).toHaveTextContent('The road to the Hollow Chapel');
+    expect(section('Ways out')).toHaveTextContent('from Chapel Road');
+    expect(section('Your road')).toHaveTextContent('Follow Chapel Road to the Hollow Chapel');
   });
 });

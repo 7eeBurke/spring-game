@@ -29,9 +29,22 @@ import com.leeburke.springgame.world.ScenePlacement;
 public final class CompleteRegionValidator implements RegionValidator {
 
 	private final RegionDefinition definition;
+	private final java.util.function.Function<String, java.util.Optional<com.leeburke.springgame.content.world.SceneArchetypeDefinition>> archetypes;
 
+	/** Validation without the entrance rules (no archetype definitions to check them against). */
 	public CompleteRegionValidator(RegionDefinition definition) {
+		this(definition, code -> java.util.Optional.empty());
+	}
+
+	/**
+	 * @param archetypes the archetype definitions, for the entrance rules: the region opens with one of
+	 *                   its opening archetypes; every way in (the road back from the first scene, and every
+	 *                   exit toward the first scene) leaves from its scene's entrance zone
+	 */
+	public CompleteRegionValidator(RegionDefinition definition,
+			java.util.function.Function<String, java.util.Optional<com.leeburke.springgame.content.world.SceneArchetypeDefinition>> archetypes) {
 		this.definition = Objects.requireNonNull(definition, "definition");
+		this.archetypes = Objects.requireNonNull(archetypes, "archetypes");
 	}
 
 	@Override
@@ -111,9 +124,46 @@ public final class CompleteRegionValidator implements RegionValidator {
 			}
 		}));
 
+		checkEntrances(region, scenes, links, entry, problems);
 		checkBossEntity(region, boss, problems);
 		checkUniqueEvents(region, problems);
 		return problems.stream().distinct().toList();
+	}
+
+	/** The way into each scene leaves from its entrance; the region opens behind its exterior doors. */
+	private void checkEntrances(GeneratedRegion region, Map<UUID, SceneInstance> scenes, Map<UUID, Set<UUID>> links, UUID entry,
+			List<String> problems) {
+		SceneInstance first = scenes.get(entry);
+		if (first != null && !definition.openingArchetypes().contains(first.definitionCode())) {
+			problems.add("The first scene uses " + first.definitionCode() + ", which is not an opening archetype of " + definition.code());
+		}
+		Map<UUID, Integer> depth = new HashMap<>();
+		java.util.ArrayDeque<UUID> queue = new java.util.ArrayDeque<>();
+		depth.put(entry, 0);
+		queue.add(entry);
+		while (!queue.isEmpty()) {
+			UUID at = queue.poll();
+			for (UUID next : links.getOrDefault(at, Set.of())) {
+				if (!depth.containsKey(next)) {
+					depth.put(next, depth.get(at) + 1);
+					queue.add(next);
+				}
+			}
+		}
+		for (SceneInstance scene : region.scenes()) {
+			java.util.Optional<com.leeburke.springgame.content.world.SceneArchetypeDefinition> archetype = archetypes.apply(scene.definitionCode());
+			if (archetype.isEmpty() || !depth.containsKey(scene.id())) {
+				continue;
+			}
+			String entrance = archetype.get().entranceZone();
+			for (com.leeburke.springgame.world.SceneExit exit : scene.state().exits()) {
+				Integer there = depth.get(exit.destinationSceneId());
+				boolean inward = !scenes.containsKey(exit.destinationSceneId()) || there != null && there < depth.get(scene.id());
+				if (inward && !exit.zoneId().equals(entrance)) {
+					problems.add("Scene " + scene.id() + " way in " + exit.id() + " leaves from " + exit.zoneId() + ", not its entrance " + entrance);
+				}
+			}
+		}
 	}
 
 	private void checkOwnershipAndArchetypes(GeneratedRegion region, Map<UUID, SceneInstance> scenes, List<String> problems) {

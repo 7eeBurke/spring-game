@@ -52,7 +52,8 @@ class SceneContentGeneratorTest {
 		assertThat(state.hazards()).hasSize(1);
 		assertThat(state.activeEvents()).extracting(SceneEvent::id).containsExactly("v");
 		assertThat(state.hiddenContent()).isEmpty();
-		assertThat(state.exits()).containsExactly(new SceneExit("exit_1", "a", NEXT));
+		// A way deeper leaves from an exit zone other than the entrance ("a").
+		assertThat(state.exits()).containsExactly(new SceneExit("exit_1", "b", NEXT));
 		assertThat(state.zones()).isEqualTo(archetype.zones());
 	}
 
@@ -93,6 +94,30 @@ class SceneContentGeneratorTest {
 		assertThat(deduplicated.get(0)).isEqualTo(a);
 		assertThat(deduplicated.get(1).activeEvents()).extracting(SceneEvent::id).containsExactly("other");
 		assertThat(deduplicated.get(1).hiddenContent()).isEmpty();
+	}
+
+	@Test
+	void waysInLeaveFromTheEntranceAndWaysDeeperSpreadOverTheOtherExitZones() {
+		SceneArchetypeDefinition three = new SceneArchetypeDefinition("HALL", "Hall",
+				List.of(new SceneZone("door", "Door"), new SceneZone("mid", "Mid"), new SceneZone("east", "East"), new SceneZone("north", "North")),
+				List.of(new ZoneConnection("d_m", "door", "mid"), new ZoneConnection("m_e", "mid", "east"), new ZoneConnection("m_n", "mid", "north")),
+				List.of("door", "east", "north"), "door", List.of());
+		List<ExitSpec> exits = List.of(new ExitSpec("exit_1", NEXT, true), new ExitSpec("exit_2", NEXT), new ExitSpec("exit_3", NEXT),
+				new ExitSpec("road", NEXT, true));
+
+		for (long seed = 0; seed < 20; seed++) {
+			SceneState state = SceneContentGenerator.generate(three, WorldRandom.create(seed), exits);
+			java.util.Map<String, String> zoneOf = new java.util.HashMap<>();
+			state.exits().forEach(x -> zoneOf.put(x.id(), x.zoneId()));
+			assertThat(zoneOf.get("exit_1")).isEqualTo("door");
+			assertThat(zoneOf.get("road")).isEqualTo("door");
+			assertThat(java.util.Set.of(zoneOf.get("exit_2"), zoneOf.get("exit_3"))).as("two ways deeper, two deeper zones")
+					.containsExactlyInAnyOrder("east", "north");
+		}
+		// With the entrance as its only exit zone, every way out leaves from it.
+		SceneArchetypeDefinition single = new SceneArchetypeDefinition("CELL", "Cell", List.of(new SceneZone("door", "Door")), List.of(),
+				List.of("door"), "door", List.of());
+		assertThat(SceneContentGenerator.generate(single, WorldRandom.create(1), exits).exits()).allMatch(x -> x.zoneId().equals("door"));
 	}
 
 	@Test

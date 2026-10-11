@@ -192,4 +192,128 @@ class ActionInterpreterTest {
 				failed -> assertThat(failed.reason()).isEqualTo(Failure.EMPTY_INPUT));
 		assertThat(provider.calls()).isZero();
 	}
+
+	// --- First-pass reliability (the real probe's root cause) ---
+
+	/** The real probe's first answers: a valid document that echoed the request's version, 2. */
+	static final String ECHOED_VERSION = VALID.replace("\"schemaVersion\":1", "\"schemaVersion\":2");
+
+	@Test
+	void theRequestNeverCarriesASchemaVersionForTheModelToEcho() {
+		FakeAiProvider provider = FakeAiProvider.answering(VALID);
+		interpreter(provider).interpret("I slash at the acolyte", setup);
+
+		String input = provider.structuredRequests().getFirst().inputJson();
+		assertThat(input).contains("\"contextVersion\":" + ActionInterpretationContext.CURRENT_SCHEMA_VERSION)
+				.doesNotContain("schemaVersion");
+	}
+
+	@Test
+	void theAnswerSchemaPinsTheDocumentVersionWhateverTheContextVersion() {
+		tools.jackson.databind.JsonNode version = com.leeburke.springgame.shared.StrictJson.createMapper()
+				.readTree(ActionDocumentSchema.json()).get("properties").get("schemaVersion");
+
+		assertThat(version.get("type").asString()).isEqualTo("integer");
+		assertThat(version.get("enum")).hasSize(1);
+		assertThat(version.get("enum").get(0).asInt()).isEqualTo(ActionDocument.CURRENT_SCHEMA_VERSION).isEqualTo(1);
+		assertThat(ActionInterpretationContext.CURRENT_SCHEMA_VERSION).isNotEqualTo(ActionDocument.CURRENT_SCHEMA_VERSION);
+	}
+
+	@Test
+	void aValidFirstAnswerNeedsExactlyOneCall() {
+		java.util.List<ActionInterpreter.InterpretationTrace> traces = new java.util.ArrayList<>();
+		FakeAiProvider provider = FakeAiProvider.answering(VALID);
+		ActionInterpretationResult result = new ActionInterpreter(provider, "INSTRUCTIONS", 1, FakeAiProvider.settings(), traces::add)
+				.interpret("I slash at the acolyte", setup);
+
+		assertThat(result).isInstanceOfSatisfying(Interpreted.class, i -> assertThat(i.source()).isEqualTo(Source.AI));
+		assertThat(provider.calls()).isEqualTo(1);
+		assertThat(traces).singleElement().satisfies(t -> {
+			assertThat(t.attempts()).isEqualTo(1);
+			assertThat(t.repairCause()).isEmpty();
+		});
+	}
+
+	@Test
+	void anEchoedVersionIsStillRejectedAndRepairedOnceWithItsCauseRecorded() {
+		java.util.List<ActionInterpreter.InterpretationTrace> traces = new java.util.ArrayList<>();
+		FakeAiProvider provider = FakeAiProvider.answering(ECHOED_VERSION, VALID);
+		ActionInterpretationResult result = new ActionInterpreter(provider, "INSTRUCTIONS", 1, FakeAiProvider.settings(), traces::add)
+				.interpret("I slash at the acolyte", setup);
+
+		assertThat(result).isInstanceOfSatisfying(Interpreted.class, i -> assertThat(i.source()).isEqualTo(Source.AI_REPAIRED));
+		assertThat(provider.calls()).isEqualTo(2);
+		assertThat(traces).singleElement().satisfies(t -> {
+			assertThat(t.attempts()).isEqualTo(2);
+			assertThat(t.firstOutput()).isEqualTo(ECHOED_VERSION);
+			assertThat(t.firstProblems()).singleElement().asString().contains("schemaVersion must be 1");
+			assertThat(t.repairCause()).contains("PARSE:schemaVersion");
+		});
+	}
+
+	@Test
+	void repairCausesAreCategoriesAndCodesOnly() {
+		assertThat(ActionInterpreter.parseCause("steps[0].attack.target: a ZONE target needs an alias")).isEqualTo("PARSE:steps[0].attack.target");
+		assertThat(ActionInterpreter.parseCause("the output was empty")).isEqualTo("PARSE");
+		assertThat(ActionInterpreter.parseCause("Unexpected character ('x' (code 120)): was expecting")).isEqualTo("PARSE");
+
+		java.util.List<ActionInterpreter.InterpretationTrace> traces = new java.util.ArrayList<>();
+		new ActionInterpreter(FakeAiProvider.answering(STAGE_TEN_INVALID, VALID), "INSTRUCTIONS", 1, FakeAiProvider.settings(),
+				traces::add).interpret("I slash at the aisle", setup);
+		assertThat(traces.getFirst().repairCause()).contains("VALIDATION:SCHEMA_INVALID");
+	}
+
+	// --- Genuine ambiguity is not repaired ---
+
+	private static final String MOVE_ONWARD = ActionDocumentTest.step("START", "MOVE", "move",
+			"{\"movementType\":\"ADVANCE\",\"target\":" + ActionDocumentTest.none() + ",\"goal\":\"NONE\",\"approach\":\"NORMAL\"}");
+
+	@Test
+	void anAnswerWithOnlyUnclearPhrasesIsUnclearAfterOneCall() {
+		FakeAiProvider provider = FakeAiProvider.answering(ActionDocumentTest.document(null, List.of(),
+				"{\"stepNumber\":null,\"phrase\":\"until I find something\"}"));
+		ActionInterpretationResult result = interpreter(provider).interpret("I continue onward until I find something", setup);
+
+		assertThat(result).isInstanceOfSatisfying(ActionInterpretationResult.Unclear.class, unclear -> {
+			assertThat(unclear.intent()).isEmpty();
+			assertThat(unclear.phrases()).containsExactly("until I find something");
+		});
+		assertThat(provider.calls()).isEqualTo(1);
+	}
+
+	@Test
+	void stepsWithAnUnclearPhraseAreUnclearNotRepairedAndKeepTheirSteps() {
+		FakeAiProvider provider = FakeAiProvider.answering(ActionDocumentTest.document(null, List.of(MOVE_ONWARD),
+				"{\"stepNumber\":1,\"phrase\":\"until I find something\"}"));
+		ActionInterpretationResult result = interpreter(provider).interpret("I continue onward until I find something", setup);
+
+		assertThat(result).isInstanceOfSatisfying(ActionInterpretationResult.Unclear.class, unclear -> {
+			assertThat(unclear.intent()).hasValueSatisfying(intent -> {
+				assertThat(intent.steps()).hasSize(1);
+				assertThat(intent.unresolvedReferences()).singleElement()
+						.satisfies(u -> assertThat(u.stepId()).contains("s1"));
+			});
+		});
+		assertThat(provider.calls()).isEqualTo(1);
+	}
+
+	@Test
+	void anUnclearPhraseBesideARealProblemIsStillRepaired() {
+		String unclearAndInvalid = ActionDocumentTest.document(null, List.of(attack(target("ZONE", "zone_1", null))),
+				"{\"stepNumber\":null,\"phrase\":\"the other one\"}");
+		FakeAiProvider provider = FakeAiProvider.answering(unclearAndInvalid, VALID);
+
+		assertThat(interpreter(provider).interpret("I slash at the other one", setup)).isInstanceOf(Interpreted.class);
+		assertThat(provider.calls()).isEqualTo(2);
+	}
+
+	@Test
+	void aSupportedAnswerWithNothingAtAllIsStillInvalid() {
+		String empty = ActionDocumentTest.document(null, List.of(), "");
+		FakeAiProvider provider = FakeAiProvider.answering(empty, empty);
+
+		assertThat(interpreter(provider).interpret("hmm", setup)).isInstanceOfSatisfying(Failed.class,
+				failed -> assertThat(failed.reason()).isEqualTo(Failure.INVALID_OUTPUT));
+		assertThat(provider.calls()).isEqualTo(2);
+	}
 }

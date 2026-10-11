@@ -98,7 +98,9 @@ Normal archetypes: `RUINED_NAVE`, `CLOISTER`, `SACRISTY`, `OSSUARY`, `BELL_PASSA
 
 ### Opening scene
 
-The entry scene's archetype is drawn with integer weights. Each normal archetype has weight **8**, except archetypes in the snapshot's recent openings, which take the weight of their most recent position:
+Only the region's **opening archetypes** may be the entry scene: the places that can lie just behind its exterior entrance. The Hollow Chapel's west doors open into the Ruined Nave or under the Bell Passage's tower; a sacristy, cloister, ossuary or reliquary never opens directly onto the road.
+
+The entry scene's archetype is drawn from them with integer weights. Each opening archetype has weight **8**, except archetypes in the snapshot's recent openings, which take the weight of their most recent position:
 
 | Position in recent openings | Weight |
 |---|---|
@@ -125,6 +127,8 @@ Each archetype has fixed zones and connections (no coordinates or grids), a list
 2. if filled, choose a candidate uniformly and a zone uniformly;
 3. roll `[0, 100)` below the hidden chance to decide whether it starts hidden.
 
+**Exits.** Each archetype names one of its exit zones as its **entrance**. A way in leaves from the entrance: the road back from the region's first scene, and every exit to a scene closer to the first scene (by passages over the region graph). Every other exit goes deeper and leaves from one of the archetype's other exit zones, drawn uniformly among those not yet holding a deeper exit while any remain; an archetype whose only exit zone is its entrance keeps every exit there. So the west doors lead in at the nave's west end, and the way on from the nave lies at its east end, the apse. The draws come after the slots in the scene's own stream, so slot contents are unchanged. The complete-region validator checks the opening archetype and that every way in leaves from its entrance. Old runs keep their stored exits.
+
 The slot ID becomes the content's local ID. Any scene may end up quiet or nearly empty; no scene is required to contain an enemy, object, hazard or event. Zones are never hidden, and progression exits are never hidden. Hidden content is safe because `PlayerSceneView` never shows it.
 
 The boss arena always places one visible `CHAPEL_GUARDIAN`; no other archetype can place it.
@@ -133,11 +137,20 @@ The boss arena always places one visible `CHAPEL_GUARDIAN`; no other archetype c
 
 The bundled archetype contents are listed in `CONTENT.md`.
 
+### Containers and the first find
+
+After a scene's slots are filled, `SceneFurnisher` furnishes it. It never changes zones, connections, entities, hazards, exits or hidden content, and it never consumes the scene's own stream, so a seed's structure is the same with or without it.
+- **Container contents:** every placed object whose definition is a container (`containers.json`, today only `CRATE`) gets a stored `ContainerState`: closed, holding at most one item. Its own stream is `derive(sceneSeed, 4, fnv1a(objectId))`: roll `[0, 100)` below `chanceEmpty` for an empty crate, otherwise choose one candidate item uniformly.
+- **The first find:** the region's entry scene (the one holding the hub's return exit) gets one extra object, local ID `first_find`, of the `firstFind` object type. It is placed in a zone joined by a visible connection to the arrival zone (so it is in sight, one step away, on arrival), is never hidden, and always holds one of the `firstFind` candidates. Its stream is `derive(sceneSeed, 5, 0)`. Other crates may be empty.
+
+Contents are generated with the region, persisted, and never rolled again on entry or reload. Runs created before containers existed decode their crates as closed and empty (`LegacyContainers`); nothing is invented for them.
+
 ## Randomness and Seeds
 
 - One algorithm: `L64X128MixRandom` (specified by the JDK's `java.util.random` documentation).
 - Seed derivation uses the SplitMix64 finalizer `mix64`, and `derive(parent, domain, index) = mix64(parent ^ mix64(domain + index × 0x9E3779B97F4A7C15))`.
 - **Attempt seed:** `derive(runSeed, 1, attempt)`. Each attempt's topology and archetype draws use one stream from it.
+- **Furnishing seeds:** container contents use domain 4 and the first find domain 5 (Containers and the first find), so they never shift a structural draw.
 - **Scene seed:** `derive(attemptSeed, 2, sceneIndex)`, where scenes are indexed in generation order (route stages, optional scenes, boss). Each scene's contents and exit zones use that scene's own stream, so a draw in one scene never shifts another.
 - The scene seed is persisted with each `REGION` scene as provenance only. It is never used to reroll a scene. The hub has no seed.
 - Runtime UUIDs come from a separate ID source and never consume the procedural streams. They are persistence identity, not part of the reproducibility contract.
@@ -201,10 +214,13 @@ Scene identity, run, region, kind, definition code, seed, discovered flag and re
 - `environmentFlags[]` — scene-wide state flags (codes)
 - `hiddenContent[]` — typed references (kind + local ID) marking content as hidden; content is stored once
 - `discoveredFacts[]` — fact codes the player has genuinely learned
+- `containers[]` — per container object: `objectId`, `open`, `contents` (item codes); a closed container's contents are never shown
+- `visitedZones` — the zones the player has stood in. A new scene starts with none; scenes stored before it existed do not know (nothing is then claimed about where the player has been)
+- `seenZones` — the zones the player has seen in this scene. A new scene starts with none seen. It is absent for scenes stored before it existed, and absent means the whole non-hidden scene is known (old saves keep exactly the knowledge they had)
 
 Structural integrity is enforced: unique local IDs per collection, every zone reference resolves, connections join two distinct existing zones with no duplicate pairs, hidden references resolve to real content of their kind, and flags/facts are unique codes.
 
-Scene history is deferred until its entry schema is designed. Per-object state (for example burned or open) and zone tags are deferred until a mechanic needs them.
+Scene history is deferred until its entry schema is designed. Container state (open, contents) is the only per-object state. Other object state (for example burned) and zone tags are deferred until a mechanic needs them.
 
 ### PlayerSceneView
 
@@ -214,7 +230,17 @@ The only scene representation given to action interpretation and AI roles. It us
 - visible connections between visible zones (no connection IDs);
 - visible entities, objects and hazards (local ID, definition code, zone);
 - known exits (local ID and zone; never the destination);
+- containers among the visible objects (open or closed, and contents only when open);
 - discovered facts.
+
+### Exit labels
+
+What a known exit is called is derived by `ExitLabels` from persisted state on every read, never from hidden content. It is never stored, so runs created earlier get labels too.
+- The hub's exit names the region it leads to: "the road to the Hollow Chapel" (public lore).
+- An exit whose destination scene has been discovered names it: "the way to The Last Lantern".
+- Any other exit is "an unexplored way".
+
+Hidden exits get no label. Labels reach the interpreter context, the narrator's surroundings and `GameView` exits; `PlayerSceneView` itself still never carries destinations.
 
 Projection rules, given the set of currently visible zones supplied by the caller:
 - hidden zones are never shown, even if the caller lists them;
@@ -223,7 +249,15 @@ Projection rules, given the set of currently visible zones supplied by the calle
 - a connection is shown only if it is not hidden and both its zones are visible;
 - the current zone must exist, must not be hidden and must be among the visible zones.
 
-Determining which zones are visible (line of sight) is deferred. During play (Stage 14), every non-hidden zone of the current scene is treated as visible. Hidden content therefore stays hidden, and everything else in the scene is shown. Active events and environment flags are not exposed until rules define how they become perceivable. Combat range and relative positioning belong to combat.
+**Leads** (`ExplorationLeads`), from the known view only: known ways out whose destination is undiscovered (unexplored), known places not yet stood in (unvisited, when visits are recorded), places already stood in, and the other known ways; each with its distance and the first place to go through. "Nothing known left" never claims that no other way exists. Hidden or unseen zones, exits and objects cannot be leads.
+
+**Known, perceivable, reachable, interactable** (`SceneKnowledge`). There is no line of sight; these are graph rules over visible (non-hidden) connections:
+- **Perceivable now:** the player's zone and every zone joined to it by a visible connection.
+- **Known:** the scene's `seenZones` plus what is perceivable now. On arrival and after every move, what is perceivable is added to `seenZones` and persisted. A scene stored without `seenZones` is known in full.
+- **Reachable:** a path of visible connections through known zones exists. Distances (`steps`) and the next step toward a zone use only those.
+- **Interactable:** in the player's zone.
+
+The player's view (`GameSnapshot.view()`) is the **known** view: the interpreter context, `GameView` (the Scene sheet), route grounding, hints and narration use it, so an unseen zone, and anything in it, appears nowhere. Narration perceptions list only perceivable zones. **Combat is scene-wide** (`GameSnapshot.sceneView()`): enemy eligibility and attack resolution are unchanged, and an attacker the player cannot see is narrated as "something unseen". Active events and environment flags are not exposed until rules define how they become perceivable. Combat range and relative positioning belong to combat.
 
 ### Player Location
 

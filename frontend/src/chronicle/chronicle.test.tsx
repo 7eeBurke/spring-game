@@ -38,6 +38,19 @@ describe('a chronicle turn', () => {
     expect(screen.getByText('Here your story ends')).toBeInTheDocument();
   });
 
+  it('marks a walk to another place in the same scene with a quiet subheading, not a new scene', () => {
+    const { rerender } = render(<TurnEntry fresh={false} onRevealed={() => undefined} turn={turn(3, { movedTo: 'Vestment Racks' })} />);
+    expect(screen.getByLabelText('Now at Vestment Racks')).toHaveTextContent('Vestment Racks');
+    expect(screen.queryByRole('heading', { name: 'Vestment Racks' })).toBeNull();
+
+    // Crossing into a new scene gets the scene heading only; older turns without the field get neither.
+    rerender(<TurnEntry fresh={false} onRevealed={() => undefined}
+      turn={turn(4, { enteredScene: { scene: 'Sacristy', zone: 'Vestry Threshold' }, movedTo: 'Vestry Threshold' })} />);
+    expect(screen.queryByLabelText(/^Now at/)).toBeNull();
+    rerender(<TurnEntry fresh={false} onRevealed={() => undefined} turn={turn(5, {})} />);
+    expect(screen.queryByLabelText(/^Now at/)).toBeNull();
+  });
+
   it('handles older turns without recorded words, pending narration and a holding enemy', () => {
     render(<TurnEntry fresh={false} onRevealed={() => undefined} turn={turn(2, {
       action: null, narration: null, narrationPending: true,
@@ -62,6 +75,7 @@ describe('the live story screen', () => {
     const api = fakeServer(0);
     openStory();
     expect(await screen.findByLabelText('Introduction')).toHaveTextContent('You are Wren.');
+    expect(within(screen.getByRole('main')).getByText('Follow Chapel Road to the Hollow Chapel, and discover what guards its depths.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'The Last Lantern' })).toBeInTheDocument();
     expect(api.calls.map((c) => c.method)).toEqual(['GET']);
     expect(api.calls[0]!.url).toContain('/chronicle?limit=20');

@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.leeburke.springgame.action.ActionIntent;
 import com.leeburke.springgame.action.validation.ValidatedActionIntent;
 import com.leeburke.springgame.ai.AiFailureKind;
 
@@ -43,6 +44,22 @@ public sealed interface ActionInterpretationResult {
 
 	/** ACTION_NOT_SUPPORTED: the input asks for something outside the action vocabulary. */
 	record NotSupported() implements ActionInterpretationResult {
+	}
+
+	/**
+	 * The model could not tell what part of the input refers to: it named the phrases instead of
+	 * guessing. Not repaired (a repair could only invite a guess). The game may still ground the
+	 * steps it did give against the visible scene; otherwise the player is asked to clarify.
+	 *
+	 * @param intent  the steps the model did give, with their unresolved references (not validated,
+	 *                because unresolved references never pass validation); empty if it gave none
+	 * @param phrases the unresolved phrases, for diagnostics only: never shown back or logged
+	 */
+	record Unclear(Optional<ActionIntent> intent, List<String> phrases) implements ActionInterpretationResult {
+		public Unclear {
+			Objects.requireNonNull(intent, "intent");
+			phrases = List.copyOf(Objects.requireNonNull(phrases, "phrases"));
+		}
 	}
 
 	/** INTERPRETATION_FAILED, with player-safe details. */

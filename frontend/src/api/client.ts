@@ -13,6 +13,8 @@ export class ApiError extends Error {
     message: string,
     readonly reason?: string,
     readonly hint?: string,
+    /** Server guidance from a Retry-After header, in milliseconds, when present. */
+    readonly retryAfterMs?: number,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -82,7 +84,17 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   if (!response.ok) {
     const error = (json as ApiErrorBody | null)?.error;
     throw new ApiError('http', response.status, error?.code ?? `HTTP_${response.status}`,
-      error?.message ?? 'The server could not complete the request.', error?.reason, error?.hint);
+      error?.message ?? 'The server could not complete the request.', error?.reason, error?.hint,
+      parseRetryAfter(response.headers.get('Retry-After')));
   }
   return json as T;
+}
+
+/** Retry-After as delay-seconds or an HTTP date; undefined when absent or unreadable. */
+export function parseRetryAfter(value: string | null, now: number = Date.now()): number | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (/^\d+$/.test(trimmed)) return Number(trimmed) * 1000;
+  const date = Date.parse(trimmed);
+  return Number.isNaN(date) ? undefined : Math.max(0, date - now);
 }

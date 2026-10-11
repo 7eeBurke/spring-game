@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import type { ChronicleTurn } from '../api/types';
-import { EndingPassage, IncomingAttack, NarrationPassage, PendingNarration, PlayerPassage, QuietNote, SceneHeading } from '../story/Passages';
+import { EndingPassage, IncomingAttack, NarrationPassage, PendingNarration, PlaceSubheading, PlayerPassage, QuietNote, SceneHeading } from '../story/Passages';
 
 export interface TurnEntryProps {
   turn: ChronicleTurn;
@@ -21,6 +21,7 @@ export const TurnEntry = memo(function TurnEntry({ turn, fresh, onRevealed }: Tu
         ? <PlayerPassage text={turn.action.text} kind={turn.action.kind} />
         : <QuietNote>Your words for this turn were not recorded.</QuietNote>}
       {turn.enteredScene && <SceneHeading scene={turn.enteredScene.scene} zone={turn.enteredScene.zone ?? ''} />}
+      {!turn.enteredScene && turn.movedTo && <PlaceSubheading place={turn.movedTo} />}
       {turn.narration
         ? <NarrationPassage narration={turn.narration} reveal={fresh} onRevealed={() => onRevealed(turn.turnNumber)} />
         : turn.narrationPending && <PendingNarration />}

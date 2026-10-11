@@ -24,6 +24,7 @@ import com.leeburke.springgame.ai.interpreter.ActionInterpretationContext.Owned;
 import com.leeburke.springgame.ai.interpreter.ActionInterpretationContext.Thing;
 import com.leeburke.springgame.ai.interpreter.ActionInterpretationContext.Zone;
 import com.leeburke.springgame.ai.narration.AttackCue;
+import com.leeburke.springgame.ai.narration.Surroundings;
 import com.leeburke.springgame.character.PlayerCharacterState;
 import com.leeburke.springgame.character.ToolBeltEntry;
 import com.leeburke.springgame.content.AbilityDefinition;
@@ -46,9 +47,16 @@ import com.leeburke.springgame.world.view.PlayerSceneView;
 public final class InterpretationContextBuilder {
 
 	private final WorldContentCatalog world;
+	private final java.util.function.Function<String, String> itemNames;
 
 	public InterpretationContextBuilder(WorldContentCatalog world) {
+		this(world, code -> code);
+	}
+
+	/** @param itemNames an item's display name by code (for what an open container holds) */
+	public InterpretationContextBuilder(WorldContentCatalog world, java.util.function.Function<String, String> itemNames) {
 		this.world = Objects.requireNonNull(world, "world");
+		this.itemNames = Objects.requireNonNull(itemNames, "itemNames");
 	}
 
 	/** Every visible creature is ACTIVE. */
@@ -59,6 +67,20 @@ public final class InterpretationContextBuilder {
 	/** @param fallenEntityIds visible creatures at 0 HP, shown as FALLEN */
 	public InterpretationSetup build(PlayerSceneView view, PlayerCharacterState player, List<IncomingAttack> incoming,
 			Set<String> fallenEntityIds) {
+		return build(view, player, incoming, fallenEntityIds, Map.of());
+	}
+
+	/** @param exitLabels where each known exit leads, as the player knows it (default: an unexplored way) */
+	public InterpretationSetup build(PlayerSceneView view, PlayerCharacterState player, List<IncomingAttack> incoming,
+			Set<String> fallenEntityIds, Map<String, String> exitLabels) {
+		return build(view, player, incoming, fallenEntityIds, exitLabels, "");
+	}
+
+	/** @param sceneCode the scene's archetype or fixed-scene code, for how the world refers to its zones */
+	public InterpretationSetup build(PlayerSceneView view, PlayerCharacterState player, List<IncomingAttack> incoming,
+			Set<String> fallenEntityIds, Map<String, String> exitLabels, String sceneCode) {
+		Objects.requireNonNull(exitLabels, "exitLabels");
+		Objects.requireNonNull(sceneCode, "sceneCode");
 		Objects.requireNonNull(view, "view");
 		Objects.requireNonNull(fallenEntityIds, "fallenEntityIds");
 		Objects.requireNonNull(player, "player");
@@ -66,8 +88,16 @@ public final class InterpretationContextBuilder {
 		AliasTable.Builder aliases = AliasTable.builder();
 
 		Map<String, String> zoneAliases = mint(aliases, AliasKind.ZONE, view.zones(), PlayerSceneView.VisibleZone::id);
+		var texts = world.texts().scene(sceneCode);
 		List<Zone> zones = sorted(view.zones(), PlayerSceneView.VisibleZone::id).stream()
-				.map(z -> new Zone(zoneAliases.get(z.id()), z.displayName())).toList();
+				.map(z -> new Zone(zoneAliases.get(z.id()), z.displayName(),
+						texts.map(t -> t.zones().get(z.id())).map(text -> text.phrase()).orElse(null),
+						texts.map(t -> t.zones().get(z.id())).map(text -> text.description()).orElse(null)))
+				.toList();
+		// How each known way looks, as the player sees it (only exits in the known view are here at all).
+		com.leeburke.springgame.ai.narration.PlaceDescriber passages = new com.leeburke.springgame.ai.narration.PlaceDescriber(world,
+				sceneCode, view, fallenEntityIds, exitLabels, itemNames);
+		Map<String, Integer> steps = view.stepsFrom(view.currentZoneId());
 		List<Connection> connections = view.connections().stream()
 				.map(c -> new Connection(zoneAliases.get(c.zoneA()), zoneAliases.get(c.zoneB())))
 				.sorted(Comparator.comparing(Connection::zoneA).thenComparing(Connection::zoneB))
@@ -80,13 +110,19 @@ public final class InterpretationContextBuilder {
 				.toList();
 		Map<String, String> objectAliases = mint(aliases, AliasKind.OBJECT, view.objects(), PlayerSceneView.VisibleObject::id);
 		List<Thing> objects = sorted(view.objects(), PlayerSceneView.VisibleObject::id).stream()
-				.map(o -> new Thing(objectAliases.get(o.id()), name(o.definitionCode()), zoneAliases.get(o.zoneId()))).toList();
+				.map(o -> new Thing(objectAliases.get(o.id()), name(o.definitionCode()), zoneAliases.get(o.zoneId()),
+						view.container(o.id()).map(this::containerText).orElse(null), reach(steps, o.zoneId())))
+				.toList();
 		Map<String, String> hazardAliases = mint(aliases, AliasKind.HAZARD, view.hazards(), PlayerSceneView.VisibleHazard::id);
 		List<Thing> hazards = sorted(view.hazards(), PlayerSceneView.VisibleHazard::id).stream()
-				.map(h -> new Thing(hazardAliases.get(h.id()), name(h.definitionCode()), zoneAliases.get(h.zoneId()))).toList();
+				.map(h -> new Thing(hazardAliases.get(h.id()), name(h.definitionCode()), zoneAliases.get(h.zoneId()), null,
+						reach(steps, h.zoneId())))
+				.toList();
 		Map<String, String> exitAliases = mint(aliases, AliasKind.EXIT, view.exits(), PlayerSceneView.KnownExit::id);
 		List<Exit> exits = sorted(view.exits(), PlayerSceneView.KnownExit::id).stream()
-				.map(x -> new Exit(exitAliases.get(x.id()), zoneAliases.get(x.zoneId()))).toList();
+				.map(x -> new Exit(exitAliases.get(x.id()), zoneAliases.get(x.zoneId()),
+						exitLabels.getOrDefault(x.id(), Surroundings.UNEXPLORED),
+						texts.isPresent() ? passages.wayPassage(x.id()) : null)).toList();
 
 		Map<String, WeaponDefinition> weaponRefs = new LinkedHashMap<>();
 		Map<String, ItemDefinition> itemRefs = new LinkedHashMap<>();
@@ -147,5 +183,28 @@ public final class InterpretationContextBuilder {
 			byId.put(id.apply(item), aliases.mint(kind, id.apply(item)));
 		}
 		return byId;
+	}
+
+	/** "closed", "open, holding a Bandage" or "open and empty": a closed container's contents are never told. */
+	private String containerText(PlayerSceneView.VisibleContainer container) {
+		if (!container.open()) {
+			return "closed";
+		}
+		return container.contents().isEmpty() ? "open and empty"
+				: "open, holding " + String.join(" and ", container.contents().stream().map(itemNames).toList());
+	}
+
+	/** How far a zone is along the passages the player knows. */
+	private static String reach(Map<String, Integer> steps, String zoneId) {
+		Integer n = steps.get(zoneId);
+		if (n == null) {
+			return "no known way";
+		}
+		return switch (n) {
+			case 0 -> "here";
+			case 1 -> "one step away";
+			case 2 -> "two steps away";
+			default -> "farther";
+		};
 	}
 }

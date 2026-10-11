@@ -3,6 +3,7 @@
     "code": "HOLLOW_CHAPEL",
     "displayName": "Hollow Chapel",
     "normalArchetypes": ["RUINED_NAVE", "CLOISTER", "SACRISTY", "OSSUARY", "BELL_PASSAGE", "RELIQUARY"],
+    "openingArchetypes": ["RUINED_NAVE", "BELL_PASSAGE"],
     "bossArchetype": "GUARDIAN_SANCTUM",
     "bossEntity": "CHAPEL_GUARDIAN",
     "requiredScenes": { "min": 5, "max": 7 },

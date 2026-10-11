@@ -75,7 +75,7 @@ public class WorldStore {
 		RegionDefinition definition = worldContent.findRegion(world.region().region().definitionCode())
 				.orElseThrow(() -> new IllegalArgumentException("Unknown region definition "
 						+ world.region().region().definitionCode()));
-		List<String> problems = new CompleteRegionValidator(definition).problems(world.region());
+		List<String> problems = new CompleteRegionValidator(definition, worldContent::findArchetype).problems(world.region());
 		if (!problems.isEmpty()) {
 			throw new IllegalArgumentException("Refusing to persist an invalid generated region for run " + runId + ": " + problems);
 		}

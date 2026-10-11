@@ -1,0 +1,6 @@
+{
+  "containers": [
+    { "object": "CRATE", "chanceEmpty": 40, "candidates": ["BANDAGE", "RESTORATIVE_SALVE", "TORCH", "ROPE"] }
+  ],
+  "firstFind": { "object": "CRATE", "candidates": ["RESTORATIVE_SALVE", "BANDAGE", "TORCH"] }
+}

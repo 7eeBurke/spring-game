@@ -276,8 +276,10 @@ class RunApiIntegrationTest {
 				.map(id -> world.findScene(id).orElseThrow())
 				.filter(s -> enemies.findEnemies(s.id()).stream().anyMatch(e -> !s.state().isHidden(HiddenContentKind.ENTITY, e.entityId())))
 				.findFirst().orElseThrow();
-		String zone = scene.state().zones().stream().map(z -> z.id())
-				.filter(z -> !scene.state().isHidden(HiddenContentKind.ZONE, z)).findFirst().orElseThrow();
+		// Stand with a visible enemy: only an enemy in the player's zone can attack.
+		String zone = scene.state().entities().stream().filter(e -> !scene.state().isHidden(HiddenContentKind.ENTITY, e.id()))
+				.filter(e -> enemies.findEnemies(scene.id()).stream().anyMatch(x -> x.entityId().equals(e.id()))).findFirst()
+				.orElseThrow().zoneId();
 		world.setPlayerLocation(run.id(), new PlayerLocation(scene.id(), zone));
 
 		StringBuilder everything = new StringBuilder();

@@ -324,11 +324,11 @@ class WorldStoreIntegrationTest {
 	@Test
 	void unsupportedStateSchemaVersionFailsClearly() {
 		SceneInstance scene = persistedRegionScene(runA, minimalScene());
-		jdbc.update("UPDATE scene_instance SET state_schema_version = 2 WHERE id = ?", scene.id());
+		jdbc.update("UPDATE scene_instance SET state_schema_version = 4 WHERE id = ?", scene.id());
 
 		assertThatThrownBy(() -> world.findScene(scene.id()))
 				.isInstanceOf(PersistedStateException.class)
 				.hasMessageContaining(scene.id().toString())
-				.hasMessageContaining("unsupported scene-state schema version 2");
+				.hasMessageContaining("unsupported scene-state schema version 4");
 	}
 }

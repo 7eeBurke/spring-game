@@ -53,3 +53,14 @@
   font-style: italic;
   color: var(--color-text-muted);
 }
+
+/* The run's opening direction: a quiet line under the introduction, not a quest log. */
+.objective {
+  margin: var(--space-4) auto 0;
+  max-width: 32rem;
+  text-align: center;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.1rem;
+  color: var(--color-gold);
+}

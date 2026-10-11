@@ -1,0 +1,116 @@
+/* Status of the outstanding action: quiet, one line where possible, never a modal. */
+.status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+  font-size: var(--text-small);
+  line-height: 1.4;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.problem {
+  color: var(--color-text-soft);
+  font-style: normal;
+}
+
+.actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-2);
+}
+
+.button {
+  min-height: var(--tap);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-text-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-style: normal;
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-left: 2px solid var(--color-gold-dim);
+  font-size: var(--text-small);
+  line-height: 1.45;
+  color: var(--color-text-soft);
+}
+
+.noticeHint {
+  display: block;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.dismiss {
+  flex-shrink: 0;
+  min-width: 2rem;
+  min-height: 2rem;
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+}
+
+/* Defense shortcuts: small, quiet text links under the cue; free text stays primary. */
+.shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-3);
+  margin-top: var(--space-1);
+  font-size: var(--text-label);
+  color: var(--color-text-muted);
+}
+
+.shortcut {
+  min-height: 2rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-gold-dim);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-decoration: underline;
+  text-decoration-color: var(--color-rule);
+  text-underline-offset: 3px;
+}
+
+/* The player's words while the outcome is unknown: their style, plus a quiet caption. */
+.awaiting {
+  margin-top: calc(-1 * var(--passage-gap) + var(--space-1));
+  margin-bottom: var(--passage-gap);
+  padding-left: var(--player-indent);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+}
+
+/* A refused action spends no turn: said quietly, after what matters. */
+.noTurn {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}

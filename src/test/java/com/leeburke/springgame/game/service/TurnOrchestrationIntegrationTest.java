@@ -7,6 +7,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -37,8 +39,11 @@ import com.leeburke.springgame.persistence.EnemyStore;
 import com.leeburke.springgame.persistence.GameRunStore;
 import com.leeburke.springgame.persistence.TurnStore;
 import com.leeburke.springgame.persistence.WorldStore;
+import com.leeburke.springgame.world.PlayerLocation;
+import com.leeburke.springgame.world.SceneEntity;
 import com.leeburke.springgame.world.SceneExit;
 import com.leeburke.springgame.world.SceneInstance;
+import com.leeburke.springgame.world.SceneKnowledge;
 
 /**
  * The Stage 14 turn pipeline against PostgreSQL, with scripted AI only: the run lifecycle, the
@@ -149,6 +154,66 @@ class TurnOrchestrationIntegrationTest {
 		assertThat(game.view(runId).status()).isEqualTo("ACTIVE");
 	}
 
+	// --- Who can attack: only an enemy standing in the player's zone ---
+
+	/** A run, a scene with a visible enemy, its zone, and an empty zone this many passages from it, where the player stands. */
+	private record Standoff(UUID runId, SceneInstance scene, String enemyZone, String playerZone) {
+	}
+
+	private Standoff standoff(int distance) {
+		for (int i = 0; i < 100; i++) {
+			UUID runId = game.newRun();
+			for (SceneInstance scene : game.scenes(runId)) {
+				List<EnemyInstance> visible = game.visibleEnemies(scene);
+				if (visible.isEmpty()) {
+					continue;
+				}
+				Set<String> occupied = scene.state().entities().stream().map(SceneEntity::zoneId).collect(java.util.stream.Collectors.toSet());
+				String enemyZone = scene.state().entities().stream().filter(e -> e.id().equals(visible.getFirst().entityId())).findFirst()
+						.orElseThrow().zoneId();
+				Optional<String> stand = SceneKnowledge.steps(scene.state().allKnown(), enemyZone).entrySet().stream()
+						.filter(e -> e.getValue() == distance && !occupied.contains(e.getKey())).map(Map.Entry::getKey).sorted().findFirst();
+				if (stand.isPresent()) {
+					SceneInstance placed = game.place(runId, s -> s.id().equals(scene.id()));
+					world.setPlayerLocation(runId, new PlayerLocation(placed.id(), stand.get()));
+					return new Standoff(runId, placed, enemyZone, stand.get());
+				}
+			}
+		}
+		throw new AssertionError("No run in 100 had an enemy with an empty zone " + distance + " passages away");
+	}
+
+	@Test
+	void anEnemyBesideOrFartherAwayNeverAttacks() {
+		for (int distance : List.of(1, 2)) {
+			Standoff standoff = standoff(distance);
+			for (int i = 0; i < 6; i++) {
+				Reply held = game.turn(standoff.runId(), "/hold");
+				assertThat(held.status()).as(held.raw()).isEqualTo(200);
+				assertThat(held.body().path("enemyTurn").isObject()).as("distance " + distance + ": no enemy acts from another zone")
+						.isFalse();
+			}
+			assertThat(game.view(standoff.runId()).awaiting()).isNotEqualTo("DEFENSE");
+		}
+	}
+
+	@Test
+	void walkingIntoAnEnemysZoneLetsItActThatSameTurn() {
+		Standoff standoff = standoff(1);
+		String name = standoff.scene().state().zones().stream().filter(z -> z.id().equals(standoff.enemyZone())).findFirst()
+				.orElseThrow().displayName();
+		String alias = game.view(standoff.runId()).scene().zones().stream().filter(z -> z.name().equals(name)).findFirst()
+				.orElseThrow().alias();
+
+		Reply entered = game.turn(standoff.runId(), "/move " + alias);
+
+		assertThat(entered.status()).as(entered.raw()).isEqualTo(200);
+		assertThat(game.view(standoff.runId()).location().zone().name()).isEqualTo(name);
+		// Nothing stops the player entering; once there, the enemy may act at once (attack or hold), and is seen doing it.
+		assertThat(entered.body().path("enemyTurn").isObject()).as("the enemy in the zone entered acts this turn").isTrue();
+		assertThat(entered.body().path("enemyTurn").path("attacker").asString()).isNotEqualTo("something unseen");
+	}
+
 	// --- The encounter ---
 
 	@Test
@@ -200,14 +265,18 @@ class TurnOrchestrationIntegrationTest {
 		assertThat(defended.body().path("view").path("awaiting").asString()).isIn("ACTION", "NONE");
 		assertThat(game.count("SELECT count(*) FROM pending_attack WHERE run_id = ?", runId)).isZero();
 
-		// Repeated defense-only turns cannot loop the encounter: with nothing incoming, nothing responds.
+		// Repeated defense-only turns cannot loop the encounter: with nothing incoming there is nothing
+		// to defend, so the action is refused (no turn, no enemy response) with grounded options.
+		long version = game.view(runId).stateVersion();
 		for (int i = 0; i < 3 && game.view(runId).status().equals("ACTIVE"); i++) {
 			Reply again = game.turn(runId, "/defend parry");
-			assertThat(again.status()).as(again.raw()).isEqualTo(200);
-			assertThat(again.body().path("overall").asString()).isEqualTo("MECHANICS_UNAVAILABLE");
-			assertThat(again.body().path("enemyTurn").isNull()).isTrue();
+			assertThat(again.status()).as(again.raw()).isEqualTo(422);
+			assertThat(again.code()).isEqualTo("ACTION_NOT_SUPPORTED");
+			assertThat(again.body().path("error").path("reason").asString()).isEqualTo("NOT_POSSIBLE_YET");
+			assertThat(again.body().path("error").path("hint").asString()).startsWith("You're at ");
 			assertThat(game.count("SELECT count(*) FROM pending_attack WHERE run_id = ?", runId)).isZero();
 		}
+		assertThat(game.view(runId).stateVersion()).isEqualTo(version);
 	}
 
 	@Test
@@ -232,7 +301,7 @@ class TurnOrchestrationIntegrationTest {
 
 	@Test
 	void aFallenEnemyStaysVisibleButNeverActsAgain() {
-		UUID runId = game.newRun();
+		UUID runId = game.newRunAmongEnemies(2);
 		SceneInstance scene = game.placeAmongEnemies(runId, 2);
 		EnemyInstance victim = game.visibleEnemies(scene).getFirst();
 		String alias = game.alias(scene, victim.entityId());
@@ -250,9 +319,12 @@ class TurnOrchestrationIntegrationTest {
 
 		for (int i = 0; i < 6 && game.view(runId).status().equals("ACTIVE"); i++) {
 			game.setPlayerHp(runId, game.maxHp(runId));
-			String other = game.view(runId).scene().creatures().stream().filter(c -> c.condition().equals("ACTIVE"))
-					.findFirst().orElseThrow().alias();
-			assertThat(game.strike(runId, other).status()).isEqualTo(200);
+			Optional<GameView.CreatureView> standing = game.view(runId).scene().creatures().stream()
+					.filter(c -> c.condition().equals("ACTIVE")).findFirst();
+			if (standing.isEmpty()) {
+				break; // the other enemy fell too: nobody is left to act
+			}
+			assertThat(game.strike(runId, standing.get().alias()).status()).isEqualTo(200);
 		}
 		assertThat(game.view(runId).scene().creatures()).filteredOn(c -> c.alias().equals(alias))
 				.singleElement().extracting(GameView.CreatureView::condition).isEqualTo("FALLEN");
@@ -267,7 +339,7 @@ class TurnOrchestrationIntegrationTest {
 		UUID runId = game.newRun();
 		game.placeAmongEnemies(runId, 1);
 		for (int i = 0; i < 60 && game.view(runId).status().equals("ACTIVE"); i++) {
-			game.untilPending(runId);
+			game.untilPending(runId, true);
 			game.setPlayerHp(runId, 1);
 			Reply reply = game.turn(runId, "/defend parry");
 			assertThat(reply.status()).as(reply.raw()).isEqualTo(200);
@@ -319,7 +391,7 @@ class TurnOrchestrationIntegrationTest {
 		assertThat(reply.status()).as(reply.raw()).isEqualTo(200);
 		assertThat(reply.body().path("changes").path("enteredScene").isNull()).isFalse();
 		assertThat(reply.body().path("enemyTurn").isNull()).isTrue();
-		assertThat(reply.body().path("narration").path("text").asString()).startsWith("You leave through the exit")
+		assertThat(reply.body().path("narration").path("text").asString()).startsWith("You pass through ")
 				.doesNotContain("the The");
 		var location = world.findPlayerLocation(runId).orElseThrow();
 		assertThat(location.sceneId()).isEqualTo(exit.destinationSceneId());

@@ -16,7 +16,7 @@ import com.leeburke.springgame.ai.openai.OpenAiProvider;
 /** AI is optional: every incomplete configuration gives a disabled provider, never a startup failure. */
 class AiConfigurationTest {
 
-	private static final AiProperties.Role NO_OVERRIDE = new AiProperties.Role(null, null, null);
+	private static final AiProperties.Role NO_OVERRIDE = new AiProperties.Role(null, null, null, null);
 	private static final AiProperties.Roles DEFAULT_ROLES = new AiProperties.Roles(NO_OVERRIDE, NO_OVERRIDE, NO_OVERRIDE, NO_OVERRIDE);
 
 	private static AiProperties properties(boolean enabled, String model, String key) {
@@ -46,8 +46,8 @@ class AiConfigurationTest {
 
 	@Test
 	void roleSettingsUseDefaultsAndOverrides() {
-		AiProperties.Roles roles = new AiProperties.Roles(new AiProperties.Role("small-model", 900, 0.0), NO_OVERRIDE, NO_OVERRIDE,
-				new AiProperties.Role(null, null, 0.9));
+		AiProperties.Roles roles = new AiProperties.Roles(new AiProperties.Role("small-model", 900, 0.0, null), NO_OVERRIDE, NO_OVERRIDE,
+				new AiProperties.Role(null, null, 0.9, null));
 		AiProperties properties = new AiProperties(true, "main-model", Duration.ofSeconds(9), 1, new AiProperties.OpenAi("k", ""),
 				roles, 500);
 
@@ -59,6 +59,35 @@ class AiConfigurationTest {
 		assertThat(settings.forRole(AiRole.ENEMY_ATTACK_NARRATOR).maxOutputTokens()).isEqualTo(200);
 		assertThat(settings.forRole(AiRole.CHARACTER_INTRODUCTION))
 				.isEqualTo(new AiGenerationSettings("main-model", 600, Duration.ofSeconds(9), Optional.of(0.9)));
+	}
+
+	@Test
+	void theNarratorHasItsOwnModelAndReasoningEffortWhileTheInterpreterKeepsTheGlobalModel() {
+		AiProperties.Roles roles = new AiProperties.Roles(NO_OVERRIDE, new AiProperties.Role("gpt-5.4-mini", null, null, "none"),
+				NO_OVERRIDE, NO_OVERRIDE);
+		AiProperties properties = new AiProperties(true, "gpt-4.1-mini", Duration.ofSeconds(9), 1, new AiProperties.OpenAi("k", ""),
+				roles, 500);
+
+		var settings = AiConfiguration.roleSettings(properties);
+
+		assertThat(settings.forRole(AiRole.OUTCOME_NARRATOR))
+				.isEqualTo(new AiGenerationSettings("gpt-5.4-mini", 400, Duration.ofSeconds(9), Optional.empty(), Optional.of("none")));
+		assertThat(settings.forRole(AiRole.ACTION_INTERPRETER))
+				.isEqualTo(new AiGenerationSettings("gpt-4.1-mini", 1500, Duration.ofSeconds(9), Optional.empty()));
+		assertThat(settings.forRole(AiRole.ENEMY_ATTACK_NARRATOR).model()).isEqualTo("gpt-4.1-mini");
+		assertThat(settings.forRole(AiRole.CHARACTER_INTRODUCTION).reasoningEffort()).isEmpty();
+	}
+
+	@Test
+	void rollingTheNarratorBackToANonReasoningModelDropsTheEffort() {
+		AiProperties.Roles roles = new AiProperties.Roles(NO_OVERRIDE, new AiProperties.Role("gpt-4.1-mini", null, null, "none"),
+				NO_OVERRIDE, NO_OVERRIDE);
+		AiProperties properties = new AiProperties(true, "gpt-4.1-mini", Duration.ofSeconds(9), 1, new AiProperties.OpenAi("k", ""),
+				roles, 500);
+
+		assertThat(AiConfiguration.roleSettings(properties).forRole(AiRole.OUTCOME_NARRATOR).reasoningEffort()).isEmpty();
+		assertThat(AiConfiguration.effort(AiRole.OUTCOME_NARRATOR, "gpt-5.4-mini", " none ")).contains("none");
+		assertThat(AiConfiguration.effort(AiRole.OUTCOME_NARRATOR, "gpt-5.4-mini", "")).isEmpty();
 	}
 
 	@Test

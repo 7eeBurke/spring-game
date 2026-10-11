@@ -58,14 +58,28 @@ export function CharacterPanel({ character }: { character: CharacterView }) {
   );
 }
 
-/** Only what the player can see: visible zones, creatures, objects, hazards and known exits. */
-export function ScenePanel({ scene, currentZone }: { scene: SceneView; currentZone: ZoneView }) {
+/**
+ * Only what the player can see: visible zones, creatures, objects, hazards and known exits. Exits
+ * are named only as far as the player knows where they lead (the server decides the wording).
+ */
+export function ScenePanel({ scene, currentZone, objective }: { scene: SceneView; currentZone: ZoneView; objective?: string }) {
   const name = (alias: string) => scene.zones.find((z) => z.alias === alias)?.name ?? alias;
+  const unvisited = new Set(scene.leads?.unvisitedZones ?? []);
+  const place = (alias: string) => [
+    scene.exits.some((x) => x.zone === alias) ? 'a way out' : '',
+    unvisited.has(alias) ? 'not yet visited' : '',
+  ].filter(Boolean).join(' · ');
   const neighbours = scene.connections
     .filter((c) => c.zoneA === currentZone.alias || c.zoneB === currentZone.alias)
     .map((c) => name(c.zoneA === currentZone.alias ? c.zoneB : c.zoneA));
   return (
     <>
+      {objective && (
+        <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>Your road</h3>
+          <p className={styles.objective}>{objective}</p>
+        </section>
+      )}
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Where you stand</h3>
         <p className={styles.here}>{currentZone.name}</p>
@@ -76,10 +90,42 @@ export function ScenePanel({ scene, currentZone }: { scene: SceneView; currentZo
         <ul className={styles.list}>
           {scene.zones.map((z) => (
             <li key={z.alias}><span className={z.alias === currentZone.alias ? styles.here : undefined}>{z.name}</span>
-              <span className={styles.muted}>{scene.exits.filter((x) => x.zone === z.alias).length ? 'a way onward' : ''}</span></li>
+              <span className={styles.muted}>{place(z.alias)}</span></li>
           ))}
         </ul>
       </section>
+      {scene.leads && (
+        <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>Not yet explored</h3>
+          {scene.leads.unexploredExits.length === 0 && scene.leads.unvisitedZones.length === 0 ? (
+            <p className={styles.muted}>Nothing you know of here is left untried.</p>
+          ) : (
+            <ul className={styles.list}>
+              {scene.leads.unexploredExits.map((alias) => {
+                const exit = scene.exits.find((x) => x.alias === alias);
+                return exit ? (
+                  <li key={alias}><span>{capitalise(exit.leadsTo)}</span>
+                    <span className={styles.muted}>{exit.zone === currentZone.alias ? 'here' : `from ${name(exit.zone)}`}</span></li>
+                ) : null;
+              })}
+              {scene.leads.unvisitedZones.map((alias) => (
+                <li key={alias}><span>{name(alias)}</span><span className={styles.muted}>not yet visited</span></li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+      {scene.exits.length > 0 && (
+        <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>Ways out</h3>
+          <ul className={styles.list}>
+            {scene.exits.map((x) => (
+              <li key={x.alias}><span>{capitalise(x.leadsTo)}</span>
+                <span className={styles.muted}>{x.zone === currentZone.alias ? 'here' : `from ${name(x.zone)}`}</span></li>
+            ))}
+          </ul>
+        </section>
+      )}
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Creatures</h3>
         {scene.creatures.length === 0 ? <p className={styles.muted}>None that you can see.</p> : (
@@ -95,11 +141,20 @@ export function ScenePanel({ scene, currentZone }: { scene: SceneView; currentZo
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Around you</h3>
           <ul className={styles.list}>
-            {scene.objects.map((o) => <li key={o.alias}><span>{o.name}</span><span className={styles.muted}>{name(o.zone)}</span></li>)}
+            {scene.objects.map((o) => (
+              <li key={o.alias}>
+                <span>{o.name}{o.container ? <span className={styles.muted}> — {o.container}</span> : null}</span>
+                <span className={styles.muted}>{o.reach === 'here' ? 'within reach' : o.reach ?? name(o.zone)}</span>
+              </li>
+            ))}
             {scene.hazards.map((h) => <li key={h.alias}><span className={styles.injured}>{h.name}</span><span className={styles.muted}>{name(h.zone)}</span></li>)}
           </ul>
         </section>
       )}
     </>
   );
+}
+
+function capitalise(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }

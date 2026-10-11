@@ -1,8 +1,8 @@
 [
-  { "code": "BANDAGE",           "displayName": "Bandage",           "category": "RECOVERY" },
-  { "code": "RESTORATIVE_SALVE", "displayName": "Restorative Salve", "category": "RECOVERY" },
-  { "code": "ROPE",              "displayName": "Rope",              "category": "UTILITY" },
-  { "code": "TORCH",             "displayName": "Torch",             "category": "UTILITY" },
-  { "code": "CROWBAR",           "displayName": "Crowbar",           "category": "UTILITY" },
-  { "code": "LOCKPICKS",         "displayName": "Lockpicks",         "category": "UTILITY" }
+  { "code": "BANDAGE",           "displayName": "Bandage",           "category": "RECOVERY", "description": "A tight roll of greyed linen, clean enough to bind a wound." },
+  { "code": "RESTORATIVE_SALVE", "displayName": "Restorative Salve", "category": "RECOVERY", "description": "A small stoppered clay vial of thick, bitter-smelling ointment." },
+  { "code": "ROPE",              "displayName": "Rope",              "category": "UTILITY", "description": "A coil of hemp rope, stiff with old damp but sound." },
+  { "code": "TORCH",             "displayName": "Torch",             "category": "UTILITY", "description": "A pitch-soaked torch, its wrapped head black and unlit." },
+  { "code": "CROWBAR",           "displayName": "Crowbar",           "category": "UTILITY", "description": "A short iron bar, flattened and bent at one end." },
+  { "code": "LOCKPICKS",         "displayName": "Lockpicks",         "category": "UTILITY", "description": "A slim leather roll of bent picks and tension wires." }
 ]

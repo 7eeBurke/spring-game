@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 import com.leeburke.springgame.character.PlayerCharacterState;
 import com.leeburke.springgame.enemy.EnemyInstance;
 import com.leeburke.springgame.world.HiddenContentKind;
+import com.leeburke.springgame.world.SceneKnowledge;
 import com.leeburke.springgame.world.PlayerLocation;
 import com.leeburke.springgame.world.SceneInstance;
 import com.leeburke.springgame.world.SceneZone;
@@ -42,19 +43,30 @@ public record GameSnapshot(RunSession session, long runSeed, PlayerCharacterStat
 	}
 
 	/**
-	 * What the player sees: every non-hidden zone of the current scene is visible (line of sight is
-	 * deferred), filtered by the Stage 8 projector so hidden content never appears.
+	 * What the player knows of the scene: the zones they have seen, and the zone they stand in with
+	 * those joined to it by a visible connection (filtered by the Stage 8 projector, so hidden content
+	 * never appears). A scene stored before seen zones were recorded is known whole. This is the view
+	 * the interpreter, the game view and narration work from; nothing further in is revealed.
 	 */
 	public PlayerSceneView view() {
+		Set<String> known = SceneKnowledge.knownZones(scene.state(), location.zoneId());
+		return PlayerSceneViewProjector.project(scene.state(), location.zoneId(), known);
+	}
+
+	/**
+	 * Every non-hidden zone of the scene, as combat has always used it: which enemies are present and
+	 * can act does not depend on what the player has seen (line of sight is deferred).
+	 */
+	public PlayerSceneView sceneView() {
 		Set<String> visible = scene.state().zones().stream().map(SceneZone::id)
 				.filter(zone -> !scene.state().isHidden(HiddenContentKind.ZONE, zone))
 				.collect(Collectors.toSet());
 		return PlayerSceneViewProjector.project(scene.state(), location.zoneId(), visible);
 	}
 
-	/** Enemies the player can see in this scene, living or fallen. */
+	/** Enemies present and not hidden in this scene, living or fallen (whether or not the player has seen them yet). */
 	public List<EnemyInstance> visibleEnemies() {
-		Set<String> visible = view().entities().stream().map(PlayerSceneView.VisibleEntity::id).collect(Collectors.toSet());
+		Set<String> visible = sceneView().entities().stream().map(PlayerSceneView.VisibleEntity::id).collect(Collectors.toSet());
 		return enemies.stream().filter(e -> visible.contains(e.entityId())).toList();
 	}
 

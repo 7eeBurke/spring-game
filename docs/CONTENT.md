@@ -58,6 +58,7 @@ The primary damage type is content identity only. Which damage an individual att
 | `code` | string | definition code format |
 | `displayName` | string | not blank |
 | `category` | `ItemCategory` | `RECOVERY`, `UTILITY` |
+| `description` | string | how the item looks in the hand, never what it does (told when it is taken) |
 
 ### Character Names
 
@@ -178,6 +179,8 @@ Authored world-generation content lives in `src/main/resources/content/world/` a
 | `scene-archetypes.json` | `SceneArchetypeDefinition` |
 | `regions.json` | `RegionDefinition` |
 | `fixed-scenes.json` | `FixedSceneDefinition` |
+| `place-texts.json` (optional) | `PlaceTexts`: what places look like |
+| `containers.json` (optional) | `ContainerRules`: what containers may hold |
 
 Each file is a top-level JSON array. Authored order is kept for inspection and deterministic iteration; generation uses explicit selection rules (see `WORLD_GENERATION.md`), never "first in the file".
 
@@ -195,6 +198,7 @@ Identity only: `code`, `displayName`, `kind` (`ENTITY`, `OBJECT`, `HAZARD`, `EVE
 | `zones` | `{id, displayName}`; at least one, unique IDs |
 | `connections` | `{id, zoneA, zoneB}`; distinct existing zones, no duplicate pairs |
 | `exitZones` | non-empty, unique, existing zones where region exits may be placed |
+| `entranceZone` | one of the exit zones: where the scene's ways in leave from (see World Generation, Exits) |
 | `slots` | content slots (below); unique slot IDs |
 
 All zones must be connected to each other.
@@ -203,11 +207,30 @@ A content slot: `id` (becomes the placed content's local ID), `kind`, `candidate
 
 ### Regions
 
+`openingArchetypes` (a non-empty subset of `normalArchetypes`) lists the archetypes that may be a region's first scene. The Hollow Chapel's are `RUINED_NAVE` and `BELL_PASSAGE`.
+
 `code`, `displayName`, `normalArchetypes` (at least 3, unique, existing, excluding the boss archetype), `bossArchetype`, `bossEntity` (an `ENTITY`), and the ranges `requiredScenes`, `optionalScenes`, `branches` as `{min, max}`. Both ends of the branch range must be attainable: `requiredScenes.min >= 2 + 2 × branches.min` and `requiredScenes.max >= 2 + 2 × branches.max`. The boss archetype must have a slot that always places exactly the boss entity, visible (`chance` 100, `hiddenChance` 0); no normal archetype may place it.
 
 ### Fixed scenes
 
 `code`, `displayName`, `zones`, `connections` (connected, as for archetypes), `startZone`, and `exit` `{id, zoneId, destinationRegion}` naming an existing region.
+
+### Place texts
+
+`place-texts.json` describes the physical world, so narration and hints can show places rather than recite their labels. One entry per archetype or fixed scene code:
+- `description`: a one-line establishing impression of the scene;
+- `zones`: per zone ID, `phrase` (a short in-world noun phrase, "the narrow alcove") and `description` (its physical character);
+- `connections`: per connection ID, the passage between its zones ("between the vestment racks");
+- `exits`: per exit zone ID, a list of at least four distinct passages, one per way out that leaves from that zone, in exit-ID order ("a low door behind where the altar rail once stood", "a gap broken through the curved wall of the apse", ...), so two ways out of one place never read alike;
+- `elements`: per world element code, a short description (objects and hazards).
+
+When the file is present, every scene, zone, connection and exit zone in the catalogue must have its text, and no text may name an unknown code. Texts are looked up by archetype and zone ID at read time, so runs created before they existed are described too. Labels (`displayName`) stay for headings, the map and the Scene sheet.
+
+`entrances` (top level), by scene code: how the region's exterior doors look from inside each opening archetype ("the sagging west doors you came in by, back out to the chapel road"). Every opening archetype of every region needs one. Compass words are used only where the generated geography makes them true: in the Ruined Nave, whose entrance is its west end and whose apse is its east end.
+
+### Containers
+
+`containers.json` has `containers`, a list of `{object, chanceEmpty, candidates}` (an `OBJECT` element code, 0–100, existing item codes), and `firstFind` `{object, candidates}`: the container and items for the guaranteed first find (World Generation, Containers and the first find). Contents are existing catalogue items; there is no loot table, rarity or crafting.
 
 Loading fails, naming the file or directory, for malformed JSON, missing or unknown fields, wrong value types, bad codes, duplicate codes, unknown references, kind mismatches, unknown or duplicate zones, broken or disconnected layouts, bad chances and unattainable count ranges.
 
@@ -246,7 +269,7 @@ Slots are written as `slot: kind [candidates] → zones, chance / hiddenChance`.
 - `arcade_floor`: HAZARD [COLLAPSING_FLOOR] → broken_arcade, 25 / 60
 - `cloister_event`: EVENT [WOUNDED_PILGRIM] → cloister_walk, 20 / 0
 
-**`SACRISTY`** — zones `vestry_door`, `vestment_racks`, `locked_alcove`; connections door–racks, racks–alcove; exit zone `vestry_door`.
+**`SACRISTY`** — zones `vestry_door` (Vestry Threshold), `vestment_racks`, `locked_alcove` (Narrow Alcove); connections door–racks, racks–alcove; exit zone `vestry_door`.
 - `sacristy_crate`: OBJECT [CRATE] → vestment_racks, locked_alcove, 70 / 20
 - `alcove_chain`: OBJECT [CHAIN] → locked_alcove, 40 / 0
 - `sacristy_enemy`: ENTITY [ASHBOUND_PENITENT] → vestment_racks, 35 / 0
@@ -266,7 +289,7 @@ Slots are written as `slot: kind [candidates] → zones, chance / hiddenChance`.
 - `passage_enemy`: ENTITY [HOLLOW_ACOLYTE, BONE_WARDEN] → bell_landing, rope_gallery, 45 / 20
 - `bell_event`: EVENT [FALSE_BLESSING] → bell_landing, 15 / 0
 
-**`RELIQUARY`** — zones `reliquary_gate`, `relic_shelves`, `sealed_reliquary`, `side_chapel`; connections gate–shelves, shelves–sealed, shelves–side; exit zones `reliquary_gate`, `side_chapel`.
+**`RELIQUARY`** — zones `reliquary_gate` (Reliquary Threshold), `relic_shelves`, `sealed_reliquary` (Inner Reliquary), `side_chapel`; connections gate–shelves, shelves–sealed, shelves–side; exit zones `reliquary_gate`, `side_chapel`.
 - `side_altar`: OBJECT [ALTAR] → side_chapel, 60 / 0
 - `shelf_clutter`: OBJECT [CRATE, CORPSE] → relic_shelves, sealed_reliquary, 60 / 25
 - `reliquary_enemy`: ENTITY [ASHBOUND_PENITENT, HOLLOW_ACOLYTE] → relic_shelves, side_chapel, 45 / 20
@@ -278,6 +301,12 @@ Slots are written as `slot: kind [candidates] → zones, chance / hiddenChance`.
 - `sanctum_pillars`: OBJECT [STONE_PILLAR] → pillared_flank, 80 / 0
 - `choir_fire`: HAZARD [FIRE] → ember_choir, guardian_dais, 50 / 0
 - `flank_floor`: HAZARD [COLLAPSING_FLOOR] → pillared_flank, ember_choir, 30 / 0
+
+Zone IDs are stable. Four display names were changed so that no place is named for a door, lock or seal that does not exist: Vestry Door → Vestry Threshold, Locked Alcove → Narrow Alcove, Reliquary Gate → Reliquary Threshold, Sealed Reliquary → Inner Reliquary. Names are stored with each generated scene, so the change applies to new runs only; old runs and their chronicles keep the names they had.
+
+### Bundled containers
+
+`CRATE`: empty 40% of the time, otherwise one of Bandage, Restorative Salve, Torch, Rope. First find: a `CRATE` holding one of Restorative Salve, Bandage, Torch.
 
 ### `THE_LAST_LANTERN`
 

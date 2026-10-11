@@ -11,7 +11,8 @@ import com.leeburke.springgame.world.ZoneConnection;
 
 /**
  * Authored structure from which a scene's contents are generated: fixed zones and connections,
- * the zones region exits may use, and optional content slots. No coordinates or grids.
+ * the zones region exits may use, the one of them that is the scene's way in ({@code entranceZone}),
+ * and optional content slots. No coordinates or grids.
  */
 public record SceneArchetypeDefinition(
 		String code,
@@ -19,7 +20,15 @@ public record SceneArchetypeDefinition(
 		List<SceneZone> zones,
 		List<ZoneConnection> connections,
 		List<String> exitZones,
+		String entranceZone,
 		List<ContentSlot> slots) {
+
+	/** An archetype whose way in is its first exit zone. */
+	public SceneArchetypeDefinition(String code, String displayName, List<SceneZone> zones, List<ZoneConnection> connections,
+			List<String> exitZones, List<ContentSlot> slots) {
+		this(code, displayName, zones, connections, exitZones, exitZones == null || exitZones.isEmpty() ? null : exitZones.getFirst(),
+				slots);
+	}
 
 	public SceneArchetypeDefinition {
 		DefinitionCodes.requireCode(code, "Archetype code");
@@ -32,6 +41,9 @@ public record SceneArchetypeDefinition(
 		exitZones = WorldText.uniqueList(exitZones, "exit zones of archetype " + code, true);
 		for (String zone : exitZones) {
 			requireZone(code, zoneIds, zone, "exit zone");
+		}
+		if (entranceZone == null || !exitZones.contains(entranceZone)) {
+			throw new IllegalArgumentException("Archetype " + code + " entrance zone must be one of its exit zones");
 		}
 		slots = List.copyOf(Objects.requireNonNull(slots, "slots"));
 		Set<String> slotIds = new HashSet<>();

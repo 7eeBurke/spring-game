@@ -43,6 +43,7 @@ export function ChronicleView({ chronicle, loadingOlder, onLoadOlder, onRevealed
       {chronicle.opening && (
         <>
           {chronicle.opening.introduction && <NarrationPassage narration={chronicle.opening.introduction} intro />}
+          {chronicle.opening.objective && <p className={styles.objective}>{chronicle.opening.objective}</p>}
           <SceneHeading scene={chronicle.opening.scene} zone={chronicle.opening.zone} />
         </>
       )}

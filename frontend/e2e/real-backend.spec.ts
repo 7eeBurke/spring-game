@@ -9,7 +9,7 @@ import { expect, test, type APIRequestContext } from '@playwright/test';
  *   docker compose up -d
  *   $env:GAME_AI_ENABLED="false"; $env:GAME_INVITE_CODES="e2e-local"
  *   .\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--game.api.limits.turns-per-minute-per-run=200 --logging.file.name=target/e2e-server.log"
- *   (in frontend/) $env:E2E_REAL_API="1"; $env:E2E_SERVER_LOG="..\target\e2e-server.log"; npx playwright test real-backend --project=phone-390
+ *   (in frontend/) $env:E2E_REAL_API="1"; $env:E2E_SERVER_LOG="..\target\e2e-server.log"; npx playwright test real- --project=phone-390 --workers=1
  *
  * The turn-limit override is test-only (a command-line argument); production defaults are
  * unchanged. The spec also paces itself: a 429 is retried later with the SAME idempotency key.

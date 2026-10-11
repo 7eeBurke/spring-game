@@ -12,6 +12,7 @@ function view(overrides: Record<string, unknown> = {}) {
   return {
     runId: RUN_ID, status: 'ACTIVE', stateVersion: 3, awaiting: 'ACTION', finalizing: false,
     introduction: { text: 'You are Wren.', source: 'AI' },
+    objective: 'Follow Chapel Road to the Hollow Chapel, and discover what guards its depths.',
     character: {
       name: 'Wren', hp: 17, maxHp: 24, stats: { MIGHT: 5, AGILITY: 8, PERCEPTION: 6, ARCANA: 4, RESOLVE: 6 }, fated: 1,
       fatedBand: 'TOUCHED', body: [{ part: 'HEAD', severity: 'HEALTHY' }], weapons: [{ alias: 'weapon_1', name: 'Longsword' }],

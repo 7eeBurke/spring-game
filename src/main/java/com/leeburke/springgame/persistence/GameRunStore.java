@@ -75,6 +75,26 @@ public class GameRunStore {
 	}
 
 	/**
+	 * Puts an item into the tool belt's next free slot (an item taken from a container).
+	 *
+	 * @throws IllegalStateException   if the belt is already full (resolution checks room first)
+	 * @throws PersistedStateException if the run has no character
+	 */
+	@Transactional
+	public void addToolBeltItem(UUID runId, String itemCode) {
+		Objects.requireNonNull(runId, "runId");
+		Objects.requireNonNull(itemCode, "itemCode");
+		PlayerCharacterEntity character = entityManager.find(PlayerCharacterEntity.class, runId);
+		if (character == null) {
+			throw new PersistedStateException("Run " + runId + " has no player character");
+		}
+		if (character.getToolBelt().size() >= com.leeburke.springgame.character.ToolBelt.CAPACITY) {
+			throw new IllegalStateException("Run " + runId + ": the tool belt is full");
+		}
+		character.getToolBelt().add(new ToolBeltEntryEmbeddable(ToolBeltEntryKind.ITEM, itemCode));
+	}
+
+	/**
 	 * Loads a run. Empty only when no run with this ID exists.
 	 *
 	 * @throws PersistedStateException if the run exists but its stored state is missing or invalid

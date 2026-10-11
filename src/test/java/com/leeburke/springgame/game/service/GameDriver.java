@@ -7,8 +7,10 @@ import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -19,7 +21,9 @@ import com.leeburke.springgame.persistence.GameRunStore;
 import com.leeburke.springgame.persistence.WorldStore;
 import com.leeburke.springgame.world.HiddenContentKind;
 import com.leeburke.springgame.world.PlayerLocation;
+import com.leeburke.springgame.world.SceneEntity;
 import com.leeburke.springgame.world.SceneInstance;
+import com.leeburke.springgame.world.SceneState;
 import com.leeburke.springgame.world.SceneZone;
 
 import tools.jackson.databind.JsonNode;
@@ -103,17 +107,60 @@ final class GameDriver {
 				.sorted(Comparator.comparing(EnemyInstance::entityId)).toList();
 	}
 
-	/** Moves the player (test arrangement only) into the first scene matching, at its first visible zone. */
+	/**
+	 * Moves the player (test arrangement only) into the first scene matching, at its first visible zone,
+	 * with the whole scene known (as in a save from before seen zones were recorded), so every enemy in
+	 * it can be addressed. Tests of what a newly entered scene reveals arrive through its exit instead.
+	 */
 	SceneInstance place(UUID runId, Predicate<SceneInstance> wanted) {
-		SceneInstance scene = scenes(runId).stream().filter(wanted).findFirst().orElseThrow();
+		SceneInstance found = scenes(runId).stream().filter(wanted).findFirst().orElseThrow();
+		SceneInstance scene = found.state().allSeen() ? found : world.updateSceneState(found.id(), found.revision(), found.state().allKnown());
 		String zone = scene.state().zones().stream().map(SceneZone::id)
 				.filter(z -> !scene.state().isHidden(HiddenContentKind.ZONE, z)).findFirst().orElseThrow();
 		world.setPlayerLocation(runId, new PlayerLocation(scene.id(), zone));
 		return scene;
 	}
 
+	/**
+	 * As {@link #place}, then (test arrangement only) gathers the scene's visible enemies into one zone
+	 * and stands the player there: only enemies in the player's zone can attack, and combat tests are
+	 * about the fight, not the walk to it.
+	 */
 	SceneInstance placeAmongEnemies(UUID runId, int atLeast) {
-		return place(runId, s -> visibleEnemies(s).size() >= atLeast);
+		return placeAmongEnemies(runId, s -> visibleEnemies(s).size() >= atLeast);
+	}
+
+	/** As {@link #placeAmongEnemies(UUID, int)}, in the first scene matching (it must hold a visible enemy). */
+	SceneInstance placeAmongEnemies(UUID runId, Predicate<SceneInstance> wanted) {
+		SceneInstance placed = place(runId, wanted);
+		Set<String> visible = visibleEnemies(placed).stream().map(EnemyInstance::entityId).collect(Collectors.toSet());
+		SceneState state = placed.state();
+		String zone = state.entities().stream().filter(e -> visible.contains(e.id())).findFirst().orElseThrow().zoneId();
+		List<SceneEntity> gathered = state.entities().stream()
+				.map(e -> visible.contains(e.id()) ? new SceneEntity(e.id(), e.definitionCode(), zone) : e).toList();
+		SceneInstance scene = world.updateSceneState(placed.id(), placed.revision(),
+				new SceneState(state.zones(), state.connections(), gathered, state.objects(), state.hazards(), state.exits(),
+						state.activeEvents(), state.environmentFlags(), state.hiddenContent(), state.discoveredFacts(),
+						state.containers(), state.seenZones()));
+		world.setPlayerLocation(runId, new PlayerLocation(scene.id(), zone));
+		return scene;
+	}
+
+	/**
+	 * A new run that has a scene with at least this many visible enemies, with the player placed
+	 * there. Not every seed generates such a scene, and the seeds a test class receives depend on
+	 * which tests ran before it in the shared context, so this tries the next runs (bounded). Two
+	 * visible enemies in one scene come up in about one seed in eight, with gaps of up to ~50 seeds.
+	 */
+	UUID newRunAmongEnemies(int atLeast) {
+		for (int i = 0; i < 100; i++) {
+			UUID runId = newRun();
+			if (scenes(runId).stream().anyMatch(s -> visibleEnemies(s).size() >= atLeast)) {
+				placeAmongEnemies(runId, atLeast);
+				return runId;
+			}
+		}
+		throw new AssertionError("No run in 100 had a scene with " + atLeast + " visible enemies");
 	}
 
 	void setPlayerHp(UUID runId, int hp) {
@@ -146,8 +193,20 @@ final class GameDriver {
 		return turn(runId, view.awaiting().equals("DEFENSE") ? "/defend parry ; " + attack : attack);
 	}
 
-	/** Keeps attacking the first active creature until an enemy attack is pending. */
+	/**
+	 * Keeps attacking the first active creature until an enemy attack is pending, restoring enemies to
+	 * full HP between swings: the aim is an attack to defend, and whether a lucky streak kills the
+	 * only enemy first must not depend on which run seed a test happens to receive.
+	 */
 	GameView untilPending(UUID runId) {
+		return untilPending(runId, true);
+	}
+
+	/**
+	 * @param keepEnemiesStanding restore the scene's enemies to full HP before each swing, so a
+	 *                            lucky run of hits cannot leave no enemy to attack
+	 */
+	GameView untilPending(UUID runId, boolean keepEnemiesStanding) {
 		for (int i = 0; i < 40; i++) {
 			GameView view = view(runId);
 			assertThat(view.status()).isEqualTo("ACTIVE");
@@ -155,6 +214,11 @@ final class GameDriver {
 				return view;
 			}
 			setPlayerHp(runId, maxHp(runId));
+			if (keepEnemiesStanding) {
+				SceneInstance scene = world.findScene(world.findPlayerLocation(runId).orElseThrow().sceneId()).orElseThrow();
+				visibleEnemies(scene).forEach(e -> setEnemyHp(scene, e.entityId(), e.maxHp()));
+				view = view(runId);
+			}
 			Optional<GameView.CreatureView> target = view.scene().creatures().stream()
 					.filter(c -> c.condition().equals("ACTIVE")).findFirst();
 			Reply reply = turn(runId, "/attack " + target.orElseThrow().alias() + " slash with weapon_1");

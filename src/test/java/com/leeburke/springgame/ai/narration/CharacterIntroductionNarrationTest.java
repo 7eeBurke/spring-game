@@ -61,7 +61,9 @@ class CharacterIntroductionNarrationTest {
 		assertThat(context.weapons()).containsExactly("Longsword");
 		assertThat(context.items()).containsExactly("Restorative Salve", "Crowbar");
 		assertThat(context.ability()).isEqualTo("Stoneblood");
-		assertThat(context.lore()).isEqualTo(LORE.premise());
+		// The premise, then the player's opening direction as the closing line of lore.
+		assertThat(context.lore()).startsWith(LORE.premise().toArray(String[]::new)).endsWith(LORE.objective());
+		assertThat(context.lore()).hasSize(LORE.premise().size() + 1);
 		assertThat(Arrays.stream(CharacterIntroductionContext.class.getRecordComponents()).map(c -> c.getName()))
 				.containsExactly("name", "stats", "fatedValue", "fatedBand", "weapons", "passive", "ability", "items", "lore");
 	}

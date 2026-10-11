@@ -38,12 +38,45 @@ class SceneStateCodecTest {
 
 	@Test
 	void richSceneRoundTrips() {
-		assertThat(codec.decode(SCENE, 1, codec.encode(richScene()))).isEqualTo(richScene());
+		assertThat(codec.decode(SCENE, 3, codec.encode(richScene()))).isEqualTo(richScene());
 	}
 
 	@Test
 	void minimalSceneRoundTrips() {
-		assertThat(codec.decode(SCENE, 1, codec.encode(minimalScene()))).isEqualTo(minimalScene());
+		assertThat(codec.decode(SCENE, 3, codec.encode(minimalScene()))).isEqualTo(minimalScene());
+	}
+
+	@Test
+	void containersAndSeenZonesRoundTrip() {
+		var scene = new com.leeburke.springgame.world.SceneState(richScene().zones(), richScene().connections(), richScene().entities(),
+				richScene().objects(), richScene().hazards(), richScene().exits(), richScene().activeEvents(),
+				richScene().environmentFlags(), richScene().hiddenContent(), richScene().discoveredFacts(),
+				java.util.List.of(new com.leeburke.springgame.world.ContainerState(richScene().objects().getFirst().id(), true,
+						java.util.List.of("BANDAGE"))),
+				java.util.Optional.of(java.util.List.of(richScene().zones().getFirst().id())),
+				java.util.Optional.of(java.util.List.of(richScene().zones().getFirst().id())));
+
+		assertThat(codec.decode(SCENE, 3, codec.encode(scene))).isEqualTo(scene);
+	}
+
+	@Test
+	void aVersionTwoDocumentKeepsWhatWasSeenAndDoesNotKnowWhereThePlayerStood() {
+		String v1 = document("[{\"id\":\"hearth\",\"displayName\":\"Hearth\"}]");
+		String v2 = v1.substring(0, v1.length() - 1) + ",\"containers\":[],\"allSeen\":false,\"seenZones\":[\"hearth\"]}";
+
+		var decoded = codec.decode(SCENE, 2, v2);
+
+		assertThat(decoded.seenZones()).contains(java.util.List.of("hearth"));
+		assertThat(decoded.visitedZones()).as("visits were not recorded then").isEmpty();
+		assertThat(decoded.visiting("hearth")).isEqualTo(decoded);
+	}
+
+	@Test
+	void aVersionOneDocumentIsFullyKnownWithNoContainerState() {
+		var decoded = codec.decode(SCENE, 1, document("[{\"id\":\"hearth\",\"displayName\":\"Hearth\"}]"));
+
+		assertThat(decoded.allSeen()).isTrue();
+		assertThat(decoded.containers()).isEmpty();
 	}
 
 	@Test
@@ -56,7 +89,8 @@ class SceneStateCodecTest {
 	void documentHoldsOnlyDynamicStateFields() {
 		Map<?, ?> top = StrictJson.createMapper().readValue(codec.encode(richScene()), Map.class);
 		assertThat(top.keySet().stream().map(String::valueOf).toList()).containsExactlyInAnyOrder("zones", "connections", "entities", "objects", "hazards",
-				"exits", "activeEvents", "environmentFlags", "hiddenContent", "discoveredFacts");
+				"exits", "activeEvents", "environmentFlags", "hiddenContent", "discoveredFacts", "containers", "allSeen", "seenZones",
+				"visitsRecorded", "visitedZones");
 	}
 
 	@Test
@@ -106,7 +140,7 @@ class SceneStateCodecTest {
 	}
 
 	@ParameterizedTest
-	@ValueSource(ints = { 0, 2 })
+	@ValueSource(ints = { 0, 4 })
 	void unsupportedSchemaVersionIsRejectedEvenForValidDocument(int version) {
 		String valid = codec.encode(richScene());
 		assertThatThrownBy(() -> codec.decode(SCENE, version, valid))

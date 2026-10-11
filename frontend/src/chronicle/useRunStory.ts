@@ -5,6 +5,7 @@ import { getView } from '../api/runs';
 import type { ChronicleTurn, GameView } from '../api/types';
 import { describeError } from '../domain/errors';
 import { summarize } from '../runs/runService';
+import { newerView } from './freshness';
 import { updateRun, type VaultEntry } from '../storage/vault';
 import {
   applyLatestPage, applyOlderPage, EMPTY_CHRONICLE, receiveTurn as receive, settleTurn, type ChronicleState,
@@ -107,7 +108,7 @@ export function useRunStory(entry: VaultEntry, initialView: GameView): RunStory 
     try {
       const [nextView, page] = await Promise.all([getView(runId, entry.token), getChronicle(runId, entry.token)]);
       if (!alive.current) return;
-      setView(nextView);
+      setView((current) => newerView(current, nextView));
       setChronicle((s) => applyLatestPage(s, page));
       updateRun(entry.localId, (x) => ({ ...x, summary: summarize(nextView) }));
     } catch (e) {
@@ -118,7 +119,7 @@ export function useRunStory(entry: VaultEntry, initialView: GameView): RunStory 
   }, [runId, entry.token, entry.localId, fail]);
 
   const receiveTurn = useCallback((turn: ChronicleTurn, nextView: GameView) => {
-    setView(nextView);
+    setView((current) => newerView(current, nextView));
     setChronicle((s) => receive(s, turn));
   }, []);
 

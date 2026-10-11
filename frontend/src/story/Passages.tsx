@@ -51,6 +51,11 @@ export function SceneHeading({ scene, zone, region }: { scene: string; zone: str
   );
 }
 
+/** A walk to another place in the same scene: a quiet map reference, not a new chapter. */
+export function PlaceSubheading({ place }: { place: string }) {
+  return <p className={styles.placeSub} aria-label={`Now at ${place}`}>{place}</p>;
+}
+
 export function IncomingAttack({ attacker, cueText, narration }:
   { attacker: string; cueText: string; narration: NarrationView | null }) {
   return (

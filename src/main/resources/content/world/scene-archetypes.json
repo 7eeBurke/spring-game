@@ -14,6 +14,7 @@
       { "id": "aisle_apse", "zoneA": "central_aisle", "zoneB": "apse" }
     ],
     "exitZones": ["nave_entrance", "apse"],
+    "entranceZone": "nave_entrance",
     "slots": [
       { "id": "pews", "kind": "OBJECT", "candidates": ["WOODEN_PEW"], "zones": ["central_aisle", "collapsed_pews"], "chance": 80, "hiddenChance": 0 },
       { "id": "nave_altar", "kind": "OBJECT", "candidates": ["ALTAR"], "zones": ["apse"], "chance": 60, "hiddenChance": 0 },
@@ -36,6 +37,7 @@
       { "id": "garth_arcade", "zoneA": "overgrown_garth", "zoneB": "broken_arcade" }
     ],
     "exitZones": ["cloister_walk", "broken_arcade"],
+    "entranceZone": "cloister_walk",
     "slots": [
       { "id": "arcade_pillar", "kind": "OBJECT", "candidates": ["STONE_PILLAR"], "zones": ["broken_arcade", "cloister_walk"], "chance": 70, "hiddenChance": 0 },
       { "id": "garth_corpse", "kind": "OBJECT", "candidates": ["CORPSE"], "zones": ["overgrown_garth", "cloister_walk"], "chance": 40, "hiddenChance": 30 },
@@ -48,15 +50,16 @@
     "code": "SACRISTY",
     "displayName": "Sacristy",
     "zones": [
-      { "id": "vestry_door", "displayName": "Vestry Door" },
+      { "id": "vestry_door", "displayName": "Vestry Threshold" },
       { "id": "vestment_racks", "displayName": "Vestment Racks" },
-      { "id": "locked_alcove", "displayName": "Locked Alcove" }
+      { "id": "locked_alcove", "displayName": "Narrow Alcove" }
     ],
     "connections": [
       { "id": "door_racks", "zoneA": "vestry_door", "zoneB": "vestment_racks" },
       { "id": "racks_alcove", "zoneA": "vestment_racks", "zoneB": "locked_alcove" }
     ],
     "exitZones": ["vestry_door"],
+    "entranceZone": "vestry_door",
     "slots": [
       { "id": "sacristy_crate", "kind": "OBJECT", "candidates": ["CRATE"], "zones": ["vestment_racks", "locked_alcove"], "chance": 70, "hiddenChance": 20 },
       { "id": "alcove_chain", "kind": "OBJECT", "candidates": ["CHAIN"], "zones": ["locked_alcove"], "chance": 40, "hiddenChance": 0 },
@@ -80,6 +83,7 @@
       { "id": "niches_post", "zoneA": "skull_niches", "zoneB": "warden_post" }
     ],
     "exitZones": ["bone_stair", "warden_post"],
+    "entranceZone": "bone_stair",
     "slots": [
       { "id": "pit_corpse", "kind": "OBJECT", "candidates": ["CORPSE"], "zones": ["charnel_pit", "skull_niches"], "chance": 80, "hiddenChance": 0 },
       { "id": "ossuary_warden", "kind": "ENTITY", "candidates": ["BONE_WARDEN"], "zones": ["warden_post", "charnel_pit"], "chance": 60, "hiddenChance": 15 },
@@ -101,6 +105,7 @@
       { "id": "gallery_belfry", "zoneA": "rope_gallery", "zoneB": "cracked_belfry" }
     ],
     "exitZones": ["bell_landing", "cracked_belfry"],
+    "entranceZone": "bell_landing",
     "slots": [
       { "id": "bell_chain", "kind": "OBJECT", "candidates": ["CHAIN"], "zones": ["rope_gallery", "cracked_belfry"], "chance": 70, "hiddenChance": 0 },
       { "id": "belfry_ceiling", "kind": "HAZARD", "candidates": ["UNSTABLE_CEILING"], "zones": ["cracked_belfry", "rope_gallery"], "chance": 45, "hiddenChance": 40 },
@@ -112,9 +117,9 @@
     "code": "RELIQUARY",
     "displayName": "Reliquary",
     "zones": [
-      { "id": "reliquary_gate", "displayName": "Reliquary Gate" },
+      { "id": "reliquary_gate", "displayName": "Reliquary Threshold" },
       { "id": "relic_shelves", "displayName": "Relic Shelves" },
-      { "id": "sealed_reliquary", "displayName": "Sealed Reliquary" },
+      { "id": "sealed_reliquary", "displayName": "Inner Reliquary" },
       { "id": "side_chapel", "displayName": "Side Chapel" }
     ],
     "connections": [
@@ -123,6 +128,7 @@
       { "id": "shelves_side", "zoneA": "relic_shelves", "zoneB": "side_chapel" }
     ],
     "exitZones": ["reliquary_gate", "side_chapel"],
+    "entranceZone": "reliquary_gate",
     "slots": [
       { "id": "side_altar", "kind": "OBJECT", "candidates": ["ALTAR"], "zones": ["side_chapel"], "chance": 60, "hiddenChance": 0 },
       { "id": "shelf_clutter", "kind": "OBJECT", "candidates": ["CRATE", "CORPSE"], "zones": ["relic_shelves", "sealed_reliquary"], "chance": 60, "hiddenChance": 25 },
@@ -147,6 +153,7 @@
       { "id": "dais_choir", "zoneA": "guardian_dais", "zoneB": "ember_choir" }
     ],
     "exitZones": ["sanctum_threshold"],
+    "entranceZone": "sanctum_threshold",
     "slots": [
       { "id": "guardian", "kind": "ENTITY", "candidates": ["CHAPEL_GUARDIAN"], "zones": ["guardian_dais"], "chance": 100, "hiddenChance": 0 },
       { "id": "sanctum_pillars", "kind": "OBJECT", "candidates": ["STONE_PILLAR"], "zones": ["pillared_flank"], "chance": 80, "hiddenChance": 0 },

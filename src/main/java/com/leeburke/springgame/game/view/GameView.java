@@ -14,9 +14,10 @@ import java.util.UUID;
  *
  * @param awaiting   ACTION, DEFENSE (an attack is pending) or NONE (the run is over or not ready)
  * @param finalizing the last turn's mechanics are committed but its narration is not stored yet
+ * @param objective  the player's opening direction, from the lore (a narrative direction, not a tracker)
  */
 public record GameView(UUID runId, String status, long stateVersion, String awaiting, boolean finalizing,
-		NarrationView introduction, CharacterView character, LocationView location, SceneView scene,
+		NarrationView introduction, String objective, CharacterView character, LocationView location, SceneView scene,
 		PendingAttackView pendingAttack, LastTurnView lastTurn) {
 
 	public record NarrationView(String text, String source) {
@@ -39,8 +40,19 @@ public record GameView(UUID runId, String status, long stateVersion, String awai
 	public record ZoneView(String alias, String name) {
 	}
 
+	/**
+	 * @param leads what the player knows is left to explore here (never anything unseen or hidden)
+	 */
 	public record SceneView(List<ZoneView> zones, List<ConnectionView> connections, List<CreatureView> creatures,
-			List<ThingView> objects, List<ThingView> hazards, List<ExitView> exits) {
+			List<ThingView> objects, List<ThingView> hazards, List<ExitView> exits, LeadsView leads) {
+	}
+
+	/**
+	 * @param unexploredExits known ways out (aliases) whose destination the player has not discovered
+	 * @param unvisitedZones  known places (aliases) the player has not stood in; empty when visits are
+	 *                        not recorded for this scene ({@code visitsRecorded} false)
+	 */
+	public record LeadsView(List<String> unexploredExits, List<String> unvisitedZones, boolean visitsRecorded) {
 	}
 
 	public record ConnectionView(String zoneA, String zoneB) {
@@ -50,10 +62,16 @@ public record GameView(UUID runId, String status, long stateVersion, String awai
 	public record CreatureView(String alias, String name, String zone, String condition) {
 	}
 
-	public record ThingView(String alias, String name, String zone) {
+	/**
+	 * A known object or hazard. {@code container}: whether a container is open and what it shows
+	 * ("closed", "open, holding a Bandage", "open and empty"), null for anything else; {@code reach}:
+	 * "here", "one step away", "two steps away", "farther" or "no known way".
+	 */
+	public record ThingView(String alias, String name, String zone, String container, String reach) {
 	}
 
-	public record ExitView(String alias, String zone) {
+	/** @param leadsTo where the exit leads as far as the player knows; undiscovered places are never named */
+	public record ExitView(String alias, String zone, String leadsTo) {
 	}
 
 	/**

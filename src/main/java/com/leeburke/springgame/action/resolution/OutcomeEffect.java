@@ -53,6 +53,21 @@ public sealed interface OutcomeEffect {
 		}
 	}
 
+	/** A closed container was opened. */
+	record ContainerOpened(String objectId) implements OutcomeEffect {
+		public ContainerOpened {
+			Refs.require(objectId, "objectId");
+		}
+	}
+
+	/** The player took an item out of a container and onto their tool belt. */
+	record ItemTaken(String objectId, String itemCode) implements OutcomeEffect {
+		public ItemTaken {
+			Refs.require(objectId, "objectId");
+			Refs.require(itemCode, "itemCode");
+		}
+	}
+
 	private static void requireDamage(int hpDamage) {
 		if (hpDamage < 0) {
 			throw new IllegalArgumentException("HP damage cannot be negative, but was " + hpDamage);
